@@ -603,6 +603,25 @@ public final class TerminalView extends View {
         mEmulator.sendMouseEvent(button, x, y, pressed);
     }
 
+    /** Programmatically scroll terminal transcript (e.g. from Android TV remote actions). */
+    public void scrollByRows(int rowsDown) {
+        if (mEmulator == null || rowsDown == 0) return;
+        boolean up = rowsDown < 0;
+        int amount = Math.abs(rowsDown);
+        for (int i = 0; i < amount; i++) {
+            if (mEmulator.isMouseTrackingActive()) {
+                MotionEvent synthetic = MotionEvent.obtain(0, 0, MotionEvent.ACTION_SCROLL, 0f, 0f, 0);
+                sendMouseEventCode(synthetic, up ? TerminalEmulator.MOUSE_WHEELUP_BUTTON : TerminalEmulator.MOUSE_WHEELDOWN_BUTTON, true);
+                synthetic.recycle();
+            } else if (mEmulator.isAlternateBufferActive()) {
+                handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
+            } else {
+                mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
+                if (!awakenScrollBars()) invalidate();
+            }
+        }
+    }
+
     /** Perform a scroll, either from dragging the screen or by scrolling a mouse wheel. */
     void doScroll(MotionEvent event, int rowsDown) {
         boolean up = rowsDown < 0;

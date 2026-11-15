@@ -273,5 +273,13 @@
     <string name="tv_drawer_toolbar_action">Araç Çubuğu</string>
     <string name="tv_drawer_session_running">Çalışan oturum</string>
     <string name="tv_drawer_session_exited">Sonlandı (%1$d)</string>
+    <string name="tv_bar_sessions">Oturumlar</string>
+    <string name="tv_bar_scroll">Kaydır</string>
+    <string name="tv_bar_scroll_on">Kaydırma Açık</string>
+    <string name="tv_bar_scroll_up">Yukarı Kaydır</string>
+    <string name="tv_bar_scroll_down">Aşağı Kaydır</string>
+    <string name="tv_bar_menu">Menü</string>
+    <string name="tv_bar_hint_default">OK: Klavye • Uzun OK: Çubuk</string>
+    <string name="tv_bar_hint_scroll_mode">Kaydırma Modu: Yukarı/Aşağı kaydır • OK/Geri çık</string>
 
 </resources>

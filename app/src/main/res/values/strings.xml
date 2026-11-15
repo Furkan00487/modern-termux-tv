@@ -283,5 +283,13 @@
     <string name="tv_drawer_toolbar_action">Toolbar</string>
     <string name="tv_drawer_session_running">Active session</string>
     <string name="tv_drawer_session_exited">Exited (%1$d)</string>
+    <string name="tv_bar_sessions">Sessions</string>
+    <string name="tv_bar_scroll">Scroll</string>
+    <string name="tv_bar_scroll_on">Scrolling</string>
+    <string name="tv_bar_scroll_up">Scroll Up</string>
+    <string name="tv_bar_scroll_down">Scroll Down</string>
+    <string name="tv_bar_menu">Menu</string>
+    <string name="tv_bar_hint_default">OK: Keyboard • Hold OK: Bar</string>
+    <string name="tv_bar_hint_scroll_mode">Scroll Mode: Up/Down scroll • OK/Back exit</string>
 
 </resources>

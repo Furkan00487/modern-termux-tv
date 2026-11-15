@@ -13,15 +13,20 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -32,6 +37,7 @@ import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.app.tv.LowRamWarningHost;
+import com.termux.app.tv.TvActionBarBridge;
 import com.termux.app.tv.TvDrawerBridge;
 import com.termux.shared.activities.ReportActivity;
 import com.termux.shared.activity.ActivityUtils;
@@ -55,6 +61,7 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.settings.properties.TermuxAppSharedProperties;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
+import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -139,11 +146,20 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     TermuxTerminalExtraKeys mTermuxTerminalExtraKeys;
 
     /**
-     * Compose for TV session drawer bridge and host view.
+     * Compose for TV session drawer, action bar, and low-RAM overlay host views.
      */
     private TvDrawerBridge mTvDrawerBridge;
     private ComposeView mTvDrawerComposeView;
     private ComposeView mLowRamComposeView;
+    private TvActionBarBridge mTvActionBarBridge;
+    private ComposeView mTvActionBarComposeView;
+    private boolean mPendingShowKeyboardAfterDrawerClose = false;
+    private final Handler mTvKeyHandler = new Handler(Looper.getMainLooper());
+    private boolean mDpadCenterLongPressed = false;
+    private final Runnable mDpadCenterLongPressRunnable = () -> {
+        mDpadCenterLongPressed = true;
+        focusTvActionBar();
+    };
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -346,6 +362,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         removeTermuxActivityRootViewGlobalLayoutListener();
 
         unregisterTermuxActivityBroadcastReceiver();
+        mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
         getDrawer().closeDrawers();
     }
 
@@ -569,6 +586,50 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void initTvDrawerCompose() {
         mLowRamComposeView = findViewById(R.id.tv_low_ram_compose_view);
         mTvDrawerComposeView = findViewById(R.id.tv_drawer_compose_view);
+        mTvActionBarComposeView = findViewById(R.id.tv_action_bar_compose_view);
+
+        mTvActionBarBridge = new TvActionBarBridge(
+            () -> {
+                getDrawer().openDrawer(Gravity.LEFT);
+                return Unit.INSTANCE;
+            },
+            () -> {
+                showTvSoftKeyboard();
+                return Unit.INSTANCE;
+            },
+            () -> {
+                if (mTerminalView != null) {
+                    mTerminalView.scrollByRows(-5);
+                }
+                return Unit.INSTANCE;
+            },
+            () -> {
+                if (mTerminalView != null) {
+                    mTerminalView.scrollByRows(5);
+                }
+                return Unit.INSTANCE;
+            },
+            () -> {
+                focusTerminalView();
+                if (mTerminalView != null) {
+                    mTerminalView.post(() -> mTerminalView.showContextMenu());
+                }
+                return Unit.INSTANCE;
+            },
+            () -> {
+                ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
+                return Unit.INSTANCE;
+            },
+            () -> {
+                focusTerminalView();
+                return Unit.INSTANCE;
+            }
+        );
+
+        if (mTvActionBarComposeView != null && ExitKillPolicy.isTelevisionDevice(this)) {
+            mTvActionBarComposeView.setVisibility(View.VISIBLE);
+            mTvActionBarBridge.bind(mTvActionBarComposeView);
+        }
 
         mTvDrawerBridge = new TvDrawerBridge(
             index -> {
@@ -618,10 +679,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 return Unit.INSTANCE;
             },
             () -> {
-                if (mTermuxTerminalViewClient != null) {
-                    mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
+                if (ExitKillPolicy.isTelevisionDevice(this)) {
+                    mPendingShowKeyboardAfterDrawerClose = true;
+                    getDrawer().closeDrawers();
+                } else {
+                    if (mTermuxTerminalViewClient != null) {
+                        mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
+                    }
+                    getDrawer().closeDrawers();
                 }
-                getDrawer().closeDrawers();
                 return Unit.INSTANCE;
             },
             () -> {
@@ -645,6 +711,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         getDrawer().addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
             @Override
             public void onDrawerOpened(@NonNull View drawerView) {
+                KeyboardUtils.hideSoftKeyboard(TermuxActivity.this, mTerminalView);
                 termuxSessionListNotifyUpdated();
                 if (mTvDrawerBridge != null) {
                     mTvDrawerBridge.notifyDrawerOpened();
@@ -656,11 +723,137 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
             @Override
             public void onDrawerClosed(@NonNull View drawerView) {
-                if (mTerminalView != null) {
-                    mTerminalView.requestFocus();
+                focusTerminalView();
+                if (mPendingShowKeyboardAfterDrawerClose) {
+                    mPendingShowKeyboardAfterDrawerClose = false;
+                    showTvSoftKeyboard();
                 }
             }
         });
+    }
+
+    private void focusTerminalView() {
+        if (mTerminalView != null) {
+            mTerminalView.requestFocus();
+        }
+    }
+
+    private void focusTvActionBar() {
+        KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+        if (mTvActionBarComposeView != null && mTvActionBarComposeView.getVisibility() == View.VISIBLE) {
+            if (mTvActionBarBridge != null) {
+                mTvActionBarBridge.requestBarFocus();
+            }
+            mTvActionBarComposeView.requestFocus();
+        } else {
+            getDrawer().openDrawer(Gravity.LEFT);
+        }
+    }
+
+    private void showTvSoftKeyboard() {
+        if (mTerminalView == null) return;
+        KeyboardUtils.clearDisableSoftKeyboardFlags(this);
+        if (mPreferences != null && !mPreferences.isSoftKeyboardEnabled()) {
+            mPreferences.setSoftKeyboardEnabled(true);
+        }
+        mTerminalView.requestFocus();
+        mTerminalView.postDelayed(() -> {
+            if (isFinishing() || isDestroyed() || mTerminalView == null) return;
+            mTerminalView.requestFocus();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.restartInput(mTerminalView);
+                if (!imm.showSoftInput(mTerminalView, 0)) {
+                    imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                }
+            }
+        }, 80);
+    }
+
+    @SuppressLint("RtlHardcoded")
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (ExitKillPolicy.isTelevisionDevice(this)
+            && (mLowRamComposeView == null || mLowRamComposeView.getVisibility() != View.VISIBLE)
+            && !getDrawer().isDrawerOpen(Gravity.LEFT)
+            && (mTvActionBarComposeView == null || !mTvActionBarComposeView.hasFocus())
+            && mTerminalView != null
+            && mTerminalView.hasFocus()) {
+
+            int keyCode = event.getKeyCode();
+            int action = event.getAction();
+
+            if (mTvActionBarBridge != null && mTvActionBarBridge.getScrollMode()) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(-3);
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(3);
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_PAGE_UP || keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
+                    if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(-8);
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_PAGE_DOWN || keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                    if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(8);
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (action == KeyEvent.ACTION_UP) {
+                        mTvActionBarBridge.setScrollModeEnabled(false);
+                        getDrawer().openDrawer(Gravity.LEFT);
+                    }
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
+                    || keyCode == KeyEvent.KEYCODE_ENTER
+                    || keyCode == KeyEvent.KEYCODE_BACK) {
+                    if (action == KeyEvent.ACTION_UP) {
+                        mTvActionBarBridge.setScrollModeEnabled(false);
+                    }
+                    return true;
+                }
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_CHANNEL_UP) {
+                if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(-8);
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                if (action == KeyEvent.ACTION_DOWN) mTerminalView.scrollByRows(8);
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+                if (action == KeyEvent.ACTION_UP) {
+                    focusTvActionBar();
+                }
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if (event.getRepeatCount() == 0) {
+                        mDpadCenterLongPressed = false;
+                        mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
+                        mTvKeyHandler.postDelayed(
+                            mDpadCenterLongPressRunnable,
+                            ViewConfiguration.getLongPressTimeout()
+                        );
+                    }
+                    return true;
+                } else if (action == KeyEvent.ACTION_UP) {
+                    mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
+                    if (!mDpadCenterLongPressed) {
+                        TerminalSession current = getCurrentSession();
+                        boolean isAltBuffer = current != null
+                            && current.getEmulator() != null
+                            && current.getEmulator().isAlternateBufferActive();
+                        if (!isAltBuffer && !KeyboardUtils.isSoftKeyboardVisible(this)) {
+                            showTvSoftKeyboard();
+                        } else if (current != null) {
+                            current.write("\r");
+                        }
+                    }
+                    mDpadCenterLongPressed = false;
+                    return true;
+                }
+            }
+        }
+
+        return super.dispatchKeyEvent(event);
     }
 
 
@@ -672,9 +865,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     public void onBackPressed() {
         if (mLowRamComposeView != null && mLowRamComposeView.getVisibility() == View.VISIBLE) {
             LowRamWarningHost.hide(mLowRamComposeView);
-            if (mTerminalView != null) mTerminalView.requestFocus();
+            focusTerminalView();
         } else if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
             getDrawer().closeDrawers();
+        } else if (mTvActionBarComposeView != null && mTvActionBarComposeView.hasFocus()) {
+            focusTerminalView();
+        } else if (mTvActionBarBridge != null && mTvActionBarBridge.getScrollMode()) {
+            mTvActionBarBridge.setScrollModeEnabled(false);
         } else if (shouldAutoKillProcessOnExit(ExitKillPolicy.ExitReason.BACK_PRESSED)) {
             TermuxApplication.terminateTermuxProcessNow(this, this);
         } else {
