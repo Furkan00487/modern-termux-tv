@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import android.view.HapticFeedbackConstants;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -397,7 +398,12 @@ public final class ExtraKeysView extends GridLayout {
         setRowCount(buttons.length);
         setColumnCount(maximumLength(buttons));
 
+        final MaterialButton[][] createdButtons = new MaterialButton[buttons.length][];
+        final int[][] buttonIds = new int[buttons.length][];
+
         for (int row = 0; row < buttons.length; row++) {
+            createdButtons[row] = new MaterialButton[buttons[row].length];
+            buttonIds[row] = new int[buttons[row].length];
             for (int col = 0; col < buttons[row].length; col++) {
                 final ExtraKeyButton buttonInfo = buttons[row][col];
 
@@ -409,10 +415,20 @@ public final class ExtraKeysView extends GridLayout {
                     button = new MaterialButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
                 }
 
+                final int viewId = View.generateViewId();
+                button.setId(viewId);
+                buttonIds[row][col] = viewId;
+                createdButtons[row][col] = button;
+
+                button.setFocusable(true);
                 button.setText(buttonInfo.getDisplay());
                 button.setTextColor(mButtonTextColor);
                 button.setAllCaps(mButtonTextAllCaps);
                 button.setPadding(0, 0, 0, 0);
+                button.setBackgroundColor(mButtonBackgroundColor);
+
+                button.setOnFocusChangeListener((view, hasFocus) ->
+                    view.setBackgroundColor(hasFocus ? mButtonActiveBackgroundColor : mButtonBackgroundColor));
 
                 button.setOnClickListener(view -> {
                     performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
@@ -432,7 +448,7 @@ public final class ExtraKeysView extends GridLayout {
                                 // Show popup on swipe up
                                 if (mPopupWindow == null && event.getY() < 0) {
                                     stopScheduledExecutors();
-                                    view.setBackgroundColor(mButtonBackgroundColor);
+                                    view.setBackgroundColor(view.hasFocus() ? mButtonActiveBackgroundColor : mButtonBackgroundColor);
                                     showPopup(view, buttonInfo.getPopup());
                                 }
                                 if (mPopupWindow != null && event.getY() > 0) {
@@ -443,12 +459,12 @@ public final class ExtraKeysView extends GridLayout {
                             return true;
 
                         case MotionEvent.ACTION_CANCEL:
-                            view.setBackgroundColor(mButtonBackgroundColor);
+                            view.setBackgroundColor(view.hasFocus() ? mButtonActiveBackgroundColor : mButtonBackgroundColor);
                             stopScheduledExecutors();
                             return true;
 
                         case MotionEvent.ACTION_UP:
-                            view.setBackgroundColor(mButtonBackgroundColor);
+                            view.setBackgroundColor(view.hasFocus() ? mButtonActiveBackgroundColor : mButtonBackgroundColor);
                             stopScheduledExecutors();
                             // If ACTION_UP up was not from a repetitive key or was with a key with a popup button
                             if (mLongPressCount == 0 || mPopupWindow != null) {
@@ -482,6 +498,36 @@ public final class ExtraKeysView extends GridLayout {
                 button.setLayoutParams(param);
 
                 addView(button);
+            }
+        }
+
+        // Bind D-pad grid navigation explicitly and clamp left/right/bottom edges so ViewPager never
+        // steals horizontal edge presses to offscreen pages. Row 0 UP stays View.NO_ID to return to TerminalView.
+        for (int row = 0; row < createdButtons.length; row++) {
+            final boolean isTopRow = (row == 0);
+            final boolean isBottomRow = (row == createdButtons.length - 1);
+            final int rowLength = createdButtons[row].length;
+            for (int col = 0; col < rowLength; col++) {
+                final MaterialButton button = createdButtons[row][col];
+                final int selfId = buttonIds[row][col];
+                final boolean isLeftEdge = (col == 0);
+                final boolean isRightEdge = (col == rowLength - 1);
+
+                button.setNextFocusLeftId(isLeftEdge ? selfId : buttonIds[row][col - 1]);
+                button.setNextFocusRightId(isRightEdge ? selfId : buttonIds[row][col + 1]);
+                if (!isBottomRow && buttonIds[row + 1].length > 0) {
+                    button.setNextFocusDownId(buttonIds[row + 1][Math.min(col, buttonIds[row + 1].length - 1)]);
+                } else {
+                    button.setNextFocusDownId(selfId);
+                }
+                if (!isTopRow && buttonIds[row - 1].length > 0) {
+                    button.setNextFocusUpId(buttonIds[row - 1][Math.min(col, buttonIds[row - 1].length - 1)]);
+                }
+
+                button.setOnKeyListener((v, keyCode, event) ->
+                    (isLeftEdge && keyCode == KeyEvent.KEYCODE_DPAD_LEFT)
+                        || (isRightEdge && keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)
+                        || (isBottomRow && keyCode == KeyEvent.KEYCODE_DPAD_DOWN));
             }
         }
     }

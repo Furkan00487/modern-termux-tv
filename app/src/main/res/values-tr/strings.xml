@@ -274,6 +274,7 @@
     <string name="tv_drawer_session_running">Çalışan oturum</string>
     <string name="tv_drawer_session_exited">Sonlandı (%1$d)</string>
     <string name="tv_bar_sessions">Oturumlar</string>
+    <string name="tv_bar_extra_keys">Alt Tuşlar</string>
     <string name="tv_bar_scroll">Kaydır</string>
     <string name="tv_bar_scroll_on">Kaydırma Açık</string>
     <string name="tv_bar_scroll_up">Yukarı Kaydır</string>

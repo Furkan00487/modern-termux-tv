@@ -1,5 +1,6 @@
 package com.termux.app.tv
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.input.key.Key
@@ -113,7 +115,15 @@ fun TerminalDrawerPanel(
                 }
             }
     ) {
-        Box(modifier = Modifier.fillMaxHeight().fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .focusProperties {
+                    onExit = { cancelFocusChange() }
+                }
+                .focusGroup()
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -357,6 +367,10 @@ private fun SessionActionOverlay(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
+            .focusProperties {
+                onExit = { cancelFocusChange() }
+            }
+            .focusGroup()
     ) {
         Column(
             modifier = Modifier.padding(20.dp),

@@ -38,6 +38,7 @@ import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.app.tv.LowRamWarningHost;
 import com.termux.app.tv.TvActionBarBridge;
+import com.termux.app.tv.TvDpadLongPressGuard;
 import com.termux.app.tv.TvDrawerBridge;
 import com.termux.shared.activities.ReportActivity;
 import com.termux.shared.activity.ActivityUtils;
@@ -154,10 +155,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private TvActionBarBridge mTvActionBarBridge;
     private ComposeView mTvActionBarComposeView;
     private boolean mPendingShowKeyboardAfterDrawerClose = false;
+    private boolean mDrawerBackgroundFocusBlocked = false;
     private final Handler mTvKeyHandler = new Handler(Looper.getMainLooper());
-    private boolean mDpadCenterLongPressed = false;
+    private final TvDpadLongPressGuard mDpadLongPressGuard = new TvDpadLongPressGuard();
     private final Runnable mDpadCenterLongPressRunnable = () -> {
-        mDpadCenterLongPressed = true;
+        mDpadLongPressGuard.onLongPressTriggered();
         focusTvActionBar();
     };
 
@@ -363,6 +365,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         unregisterTermuxActivityBroadcastReceiver();
         mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
+        mDpadLongPressGuard.reset();
+        setDrawerBackgroundFocusBlocked(false);
         getDrawer().closeDrawers();
     }
 
@@ -590,11 +594,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mTvActionBarBridge = new TvActionBarBridge(
             () -> {
-                getDrawer().openDrawer(Gravity.LEFT);
+                openTvDrawer();
                 return Unit.INSTANCE;
             },
             () -> {
                 showTvSoftKeyboard();
+                return Unit.INSTANCE;
+            },
+            () -> {
+                focusExtraKeysBar();
                 return Unit.INSTANCE;
             },
             () -> {
@@ -710,32 +718,109 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         getDrawer().addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
             @Override
+            public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {
+                if (slideOffset > 0f) {
+                    setDrawerBackgroundFocusBlocked(true);
+                }
+            }
+
+            @Override
             public void onDrawerOpened(@NonNull View drawerView) {
                 KeyboardUtils.hideSoftKeyboard(TermuxActivity.this, mTerminalView);
+                setDrawerBackgroundFocusBlocked(true);
                 termuxSessionListNotifyUpdated();
-                if (mTvDrawerBridge != null) {
-                    mTvDrawerBridge.notifyDrawerOpened();
-                }
                 if (mTvDrawerComposeView != null) {
                     mTvDrawerComposeView.requestFocus();
+                    mTvDrawerComposeView.post(() -> {
+                        if (!isFinishing() && !isDestroyed()
+                            && mTvDrawerBridge != null
+                            && getDrawer().isDrawerOpen(Gravity.LEFT)) {
+                            mTvDrawerBridge.notifyDrawerOpened();
+                        }
+                    });
+                } else if (mTvDrawerBridge != null) {
+                    mTvDrawerBridge.notifyDrawerOpened();
                 }
             }
 
             @Override
             public void onDrawerClosed(@NonNull View drawerView) {
+                setDrawerBackgroundFocusBlocked(false);
                 focusTerminalView();
                 if (mPendingShowKeyboardAfterDrawerClose) {
                     mPendingShowKeyboardAfterDrawerClose = false;
                     showTvSoftKeyboard();
                 }
             }
+
+            @Override
+            public void onDrawerStateChanged(int newState) {
+                if (newState == DrawerLayout.STATE_IDLE && !getDrawer().isDrawerOpen(Gravity.LEFT)) {
+                    setDrawerBackgroundFocusBlocked(false);
+                }
+            }
         });
+    }
+
+    @SuppressLint("RtlHardcoded")
+    private void openTvDrawer() {
+        setDrawerBackgroundFocusBlocked(true);
+        getDrawer().openDrawer(Gravity.LEFT);
+    }
+
+    private void setDrawerBackgroundFocusBlocked(boolean blocked) {
+        if (mDrawerBackgroundFocusBlocked == blocked) return;
+        mDrawerBackgroundFocusBlocked = blocked;
+        int focusability = blocked
+            ? ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            : ViewGroup.FOCUS_AFTER_DESCENDANTS;
+        View mainContent = findViewById(R.id.main_content_container);
+        if (mainContent instanceof ViewGroup) {
+            ((ViewGroup) mainContent).setDescendantFocusability(focusability);
+        }
+        ViewPager toolbarViewPager = getTerminalToolbarViewPager();
+        if (toolbarViewPager != null) {
+            toolbarViewPager.setDescendantFocusability(focusability);
+        }
     }
 
     private void focusTerminalView() {
         if (mTerminalView != null) {
             mTerminalView.requestFocus();
         }
+    }
+
+    private void focusExtraKeysBar() {
+        KeyboardUtils.hideSoftKeyboard(this, mTerminalView);
+        ViewPager toolbarViewPager = getTerminalToolbarViewPager();
+        if (toolbarViewPager == null) {
+            focusTerminalView();
+            return;
+        }
+        if (toolbarViewPager.getVisibility() != View.VISIBLE) {
+            if (mPreferences != null && !mPreferences.shouldShowTerminalToolbar()) {
+                mPreferences.toogleShowTerminalToolbar();
+            }
+            toolbarViewPager.setVisibility(View.VISIBLE);
+        }
+        if (toolbarViewPager.getCurrentItem() != 0) {
+            toolbarViewPager.setCurrentItem(0, false);
+        }
+        toolbarViewPager.post(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (mExtraKeysView != null && mExtraKeysView.getChildCount() > 0) {
+                mExtraKeysView.getChildAt(0).requestFocus();
+            } else {
+                toolbarViewPager.requestFocus();
+            }
+        });
+    }
+
+    private boolean hasExtraKeysFocus() {
+        ViewPager toolbarViewPager = getTerminalToolbarViewPager();
+        return toolbarViewPager != null
+            && toolbarViewPager.getVisibility() == View.VISIBLE
+            && toolbarViewPager.hasFocus();
     }
 
     private void focusTvActionBar() {
@@ -746,7 +831,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
             mTvActionBarComposeView.requestFocus();
         } else {
-            getDrawer().openDrawer(Gravity.LEFT);
+            openTvDrawer();
         }
     }
 
@@ -774,6 +859,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (ExitKillPolicy.isTelevisionDevice(this)
+            && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_CENTER
+            && mDpadLongPressGuard.consumePostLongPressEvent(event.getAction())) {
+            return true;
+        }
+
+        if (ExitKillPolicy.isTelevisionDevice(this)
             && (mLowRamComposeView == null || mLowRamComposeView.getVisibility() != View.VISIBLE)
             && !getDrawer().isDrawerOpen(Gravity.LEFT)
             && (mTvActionBarComposeView == null || !mTvActionBarComposeView.hasFocus())
@@ -799,7 +890,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
                     if (action == KeyEvent.ACTION_UP) {
                         mTvActionBarBridge.setScrollModeEnabled(false);
-                        getDrawer().openDrawer(Gravity.LEFT);
+                        openTvDrawer();
                     }
                     return true;
                 } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER
@@ -826,7 +917,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             } else if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
                 if (action == KeyEvent.ACTION_DOWN) {
                     if (event.getRepeatCount() == 0) {
-                        mDpadCenterLongPressed = false;
+                        mDpadLongPressGuard.reset();
                         mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
                         mTvKeyHandler.postDelayed(
                             mDpadCenterLongPressRunnable,
@@ -836,7 +927,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                     return true;
                 } else if (action == KeyEvent.ACTION_UP) {
                     mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
-                    if (!mDpadCenterLongPressed) {
+                    if (!mDpadLongPressGuard.getSuppressNextCenterUp()) {
                         TerminalSession current = getCurrentSession();
                         boolean isAltBuffer = current != null
                             && current.getEmulator() != null
@@ -847,7 +938,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                             current.write("\r");
                         }
                     }
-                    mDpadCenterLongPressed = false;
+                    mDpadLongPressGuard.reset();
                     return true;
                 }
             }
@@ -869,6 +960,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         } else if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
             getDrawer().closeDrawers();
         } else if (mTvActionBarComposeView != null && mTvActionBarComposeView.hasFocus()) {
+            focusTerminalView();
+        } else if (hasExtraKeysFocus()) {
             focusTerminalView();
         } else if (mTvActionBarBridge != null && mTvActionBarBridge.getScrollMode()) {
             mTvActionBarBridge.setScrollModeEnabled(false);

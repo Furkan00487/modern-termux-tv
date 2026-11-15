@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.view.KeyEvent
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -48,9 +50,40 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import com.termux.R
 
+/**
+ * Tracks a long-press DPAD_CENTER hold that shifted focus into the TV action bar
+ * so the trailing ACTION_UP and any auto-repeat ACTION_DOWN events from that hold
+ * are swallowed instead of immediately clicking the newly focused button.
+ */
+class TvDpadLongPressGuard {
+    var suppressNextCenterUp: Boolean = false
+        private set
+
+    fun reset() {
+        suppressNextCenterUp = false
+    }
+
+    fun onLongPressTriggered() {
+        suppressNextCenterUp = true
+    }
+
+    fun consumePostLongPressEvent(action: Int): Boolean {
+        if (!suppressNextCenterUp) return false
+        return when (action) {
+            KeyEvent.ACTION_DOWN -> true
+            KeyEvent.ACTION_UP -> {
+                suppressNextCenterUp = false
+                true
+            }
+            else -> false
+        }
+    }
+}
+
 class TvActionBarBridge(
     private val onOpenDrawer: () -> Unit,
     private val onShowKeyboard: () -> Unit,
+    private val onFocusExtraKeys: () -> Unit,
     private val onScrollUp: () -> Unit,
     private val onScrollDown: () -> Unit,
     private val onOpenContextMenu: () -> Unit,
@@ -74,6 +107,7 @@ class TvActionBarBridge(
                     focusTrigger = focusTrigger,
                     onOpenDrawer = onOpenDrawer,
                     onShowKeyboard = onShowKeyboard,
+                    onFocusExtraKeys = onFocusExtraKeys,
                     onToggleScrollMode = { toggleScrollMode() },
                     onScrollUp = onScrollUp,
                     onScrollDown = onScrollDown,
@@ -106,6 +140,7 @@ fun TvTerminalActionBar(
     focusTrigger: Int,
     onOpenDrawer: () -> Unit,
     onShowKeyboard: () -> Unit,
+    onFocusExtraKeys: () -> Unit,
     onToggleScrollMode: () -> Unit,
     onScrollUp: () -> Unit,
     onScrollDown: () -> Unit,
@@ -129,13 +164,14 @@ fun TvTerminalActionBar(
         modifier = Modifier
             .fillMaxWidth()
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.Back || event.key == Key.Escape || event.key == Key.DirectionDown)
-                ) {
-                    onReturnToTerminal()
-                    true
-                } else {
-                    false
+                val isExitKey = event.key == Key.Back || event.key == Key.Escape || event.key == Key.DirectionDown
+                when {
+                    isExitKey && event.type == KeyEventType.KeyDown -> true
+                    isExitKey && event.type == KeyEventType.KeyUp -> {
+                        onReturnToTerminal()
+                        true
+                    }
+                    else -> false
                 }
             }
     ) {
@@ -176,6 +212,22 @@ fun TvTerminalActionBar(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = stringResource(R.string.action_toggle_soft_keyboard),
+                    maxLines = 1
+                )
+            }
+
+            OutlinedButton(
+                onClick = onFocusExtraKeys,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardReturn,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.tv_bar_extra_keys),
                     maxLines = 1
                 )
             }

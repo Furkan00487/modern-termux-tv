@@ -284,6 +284,7 @@
     <string name="tv_drawer_session_running">Active session</string>
     <string name="tv_drawer_session_exited">Exited (%1$d)</string>
     <string name="tv_bar_sessions">Sessions</string>
+    <string name="tv_bar_extra_keys">Extra Keys</string>
     <string name="tv_bar_scroll">Scroll</string>
     <string name="tv_bar_scroll_on">Scrolling</string>
     <string name="tv_bar_scroll_up">Scroll Up</string>
