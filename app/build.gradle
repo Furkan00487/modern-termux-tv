@@ -42,7 +42,6 @@ android {
 
         implementation project(":terminal-view")
         implementation project(":termux-shared")
-        implementation project(":x11")
     }
 
     defaultConfig {
@@ -74,7 +73,7 @@ android {
         externalNativeBuild {
             ndkBuild {
                 cFlags "-std=c11", "-Wall", "-Wextra", "-Werror", "-Os", "-fno-stack-protector", "-Wl,--gc-sections"
-                abiFilters 'arm64-v8a'
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
             }
         }
 
@@ -83,7 +82,7 @@ android {
                 enable ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
                     (gradle.startParameter.taskNames.any { it.contains("Release") } && splitAPKsForReleaseBuilds == "1"))
                 reset ()
-                include 'arm64-v8a'
+                include 'arm64-v8a', 'armeabi-v7a'
                 universalApk false
             }
         }
@@ -172,7 +171,6 @@ android {
 dependencies {
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.robolectric:robolectric:4.17"
-    testImplementation files(project(":x11").layout.buildDirectory.file("intermediates/stub_jar/stub.jar"))
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs_nio:2.1.5"
 }
 
@@ -189,16 +187,80 @@ def validateVersionName(String versionName) {
         throw new GradleException("The versionName '"  + versionName + "' is not a valid version as per semantic version '2.0.0' spec in the format 'major.minor.patch(-prerelease)(+buildmetadata)'. https://semver.org/spec/v2.0.0.html.")
 }
 
-def patchBootstrapMotd(File zipFile) {
+def fetchVerifiedMkshBinary(String arch) {
+    def debChecksum
+    if (arch == "aarch64") {
+        debChecksum = "856a21c1ce59485ae362b3517f513815e23d672fd9284516dd851b279d1afcdf"
+    } else if (arch == "arm") {
+        debChecksum = "a20d953e5e523508954be836036297d009e9e50bb62569453201236b76346616"
+    } else {
+        throw new GradleException("Unsupported arch for mksh package: " + arch)
+    }
+
+    def cacheDir = new File(projectDir, "src/main/cpp/.mksh-cache")
+    cacheDir.mkdirs()
+    def debFile = new File(cacheDir, "mksh_59c-5_" + arch + ".deb")
+    def debUrl = "https://packages-cf.termux.dev/apt/termux-main/pool/main/m/mksh/mksh_59c-5_" + arch + ".deb"
+
+    def digest = java.security.MessageDigest.getInstance("SHA-256")
+    def verifyFile = { File f ->
+        if (!f.exists()) return false
+        digest.reset()
+        def buffer = new byte[8192]
+        f.withInputStream { input ->
+            int readBytes
+            while ((readBytes = input.read(buffer)) >= 0) {
+                digest.update(buffer, 0, readBytes)
+            }
+        }
+        def actual = new BigInteger(1, digest.digest()).toString(16).padLeft(64, '0')
+        return actual == debChecksum
+    }
+
+    if (!verifyFile(debFile)) {
+        debFile.delete()
+        logger.quiet("Downloading " + debUrl + " ...")
+        def conn = new URL(debUrl).openConnection()
+        conn.setInstanceFollowRedirects(true)
+        debFile.withOutputStream { out ->
+            out << conn.inputStream
+        }
+        if (!verifyFile(debFile)) {
+            debFile.delete()
+            throw new GradleException("Wrong SHA-256 checksum for " + debUrl)
+        }
+    }
+
+    def binFile = new File(cacheDir, "mksh-" + arch)
+    def proc = new ProcessBuilder("sh", "-c",
+        "dpkg-deb --fsys-tarfile \"\$1\" | tar -xOf - ./data/data/com.termux/files/usr/bin/mksh > \"\$2\"",
+        "sh", debFile.absolutePath, binFile.absolutePath)
+        .redirectErrorStream(true)
+        .start()
+    def procOut = proc.inputStream.text
+    int exitCode = proc.waitFor()
+    if (exitCode != 0 || !binFile.exists() || binFile.length() == 0) {
+        throw new GradleException("Failed to extract mksh for " + arch + " (exit=" + exitCode + "): " + procOut)
+    }
+
+    byte[] mkshBytes = binFile.bytes
+    if (mkshBytes.length < 4 || mkshBytes[0] != (byte) 0x7f || mkshBytes[1] != (byte) 'E' ||
+        mkshBytes[2] != (byte) 'L' || mkshBytes[3] != (byte) 'F') {
+        throw new GradleException("Extracted mksh binary for " + arch + " is not a valid ELF executable")
+    }
+    return mkshBytes
+}
+
+def patchBootstrapMotd(File zipFile, String arch) {
     File tempFile = new File(zipFile.parentFile, zipFile.name + ".motd.tmp")
     java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zipFile)
     java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(new BufferedOutputStream(new FileOutputStream(tempFile)))
 
+    byte[] mkshBytes = fetchVerifiedMkshBinary(arch)
     Enumeration<? extends java.util.zip.ZipEntry> entries = zf.entries()
     byte[] buf = new byte[8192]
     boolean hasSetupMicrophone = false
-    boolean hasTermuxX11 = false
-    boolean hasTermuxX11Pref = false
+    boolean hasMksh = false
     String trSetupMicrophone = "#!/data/data/com.termux/files/usr/bin/bash\n\n" +
                                "if [ \"\$#\" != \"0\" ]; then\n" +
                                "\techo 'kullanım: termux-setup-microphone'\n" +
@@ -209,55 +271,6 @@ def patchBootstrapMotd(File zipFile) {
                                "am broadcast --user \"\$TERMUX__USER_ID\" \\\n" +
                                "\t-a \"com.termux.app.request_microphone_permission\" \\\n" +
                                "\t \"com.termux\" > /dev/null\n"
-    String termuxX11Script = "#!/data/data/com.termux/files/usr/bin/bash\n" +
-                             "if [ ! -e /system/bin/getprop ] || [ ! -e /system/bin/app_process ]; then\n" +
-                             "  echo \"Headless system detected. Termux:X11 requires standard Android to work.\"\n" +
-                             "  exit 1\n" +
-                             "fi\n" +
-                             "if [ \"\$(getprop ro.build.version.sdk)\" -lt \"24\" ]; then\n" +
-                             "  echo \"Termux:X11 requires at least Android 7 or newer.\"\n" +
-                             "  exit 1\n" +
-                             "fi\n" +
-                             "[ -z \"\${LD_LIBRARY_PATH+x}\" ] || export XSTARTUP_LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH\"\n" +
-                             "[ -z \"\${LD_PRELOAD+x}\" ] || export XSTARTUP_LD_PRELOAD=\"\$LD_PRELOAD\"\n" +
-                             "[ -z \"\${CLASSPATH+x}\" ] || export XSTARTUP_CLASSPATH=\"\$CLASSPATH\"\n" +
-                             "APK_PATH=\"/data/data/com.termux/files/usr/libexec/termux-x11/base.apk\"\n" +
-                             "if [ ! -e \"\$APK_PATH\" ]; then\n" +
-                             "  APK_PATH=\"\$(/system/bin/pm path com.termux 2>/dev/null | head -n 1 | cut -d: -f2)\"\n" +
-                             "fi\n" +
-                             "export CLASSPATH=\"\$APK_PATH\"\n" +
-                             "unset LD_LIBRARY_PATH LD_PRELOAD\n" +
-                             "[ -n \"\$(trap -p USR1)\" ] && export TERMUX_X11_NOTIFY_PARENT=1\n" +
-                             "exec /system/bin/app_process -Xnoimage-dex2oat / --nice-name=\"termux-x11 com.termux \$*\" com.termux.x11.CmdEntryPoint \"\$@\"\n"
-    String termuxX11PrefScript = "#!/data/data/com.termux/files/usr/bin/bash\n" +
-                                 "if [ ! -e /system/bin/getprop ] || [ ! -e /system/bin/app_process ]; then\n" +
-                                 "  echo \"Headless system detected. Termux:X11 requires standard Android to work.\"\n" +
-                                 "  exit 1\n" +
-                                 "fi\n" +
-                                 "if [ \"\$(getprop ro.build.version.sdk)\" -lt \"24\" ]; then\n" +
-                                 "  echo \"Termux:X11 requires at least Android 7 or newer.\"\n" +
-                                 "  exit 1\n" +
-                                 "fi\n" +
-                                 "if [ \"\$(getprop ro.build.version.sdk)\" -ge \"34\" ]; then\n" +
-                                 "  unset LD_LIBRARY_PATH LD_PRELOAD\n" +
-                                 "  APK_PATH=\"/data/data/com.termux/files/usr/libexec/termux-x11/base.apk\"\n" +
-                                 "  if [ ! -e \"\$APK_PATH\" ]; then\n" +
-                                 "    APK_PATH=\"\$(/system/bin/pm path com.termux 2>/dev/null | head -n 1 | cut -d: -f2)\"\n" +
-                                 "  fi\n" +
-                                 "  export CLASSPATH=\"\$APK_PATH\"\n" +
-                                 "  exec /system/bin/app_process -Xnoimage-dex2oat / com.termux.x11.LoriePreferences\\\$Receiver \"\$@\"\n" +
-                                 "fi\n\n" +
-                                 "COMMAND=(\"am\" \"broadcast\" \"-a\" \"com.termux.x11.CHANGE_PREFERENCE\" \"-p\" \"com.termux\")\n" +
-                                 "help() {\n  echo \"\$0 [list] {key:value} [{key2:value2}]...\"\n  exit 1\n}\n" +
-                                 "if [ \$# -eq 0 ]; then help; fi\n" +
-                                 "if [ \"\$1\" = \"list\" ]; then\n" +
-                                 "  \"\${COMMAND[@]}\" -e list null\n" +
-                                 "  exit \$?\n" +
-                                 "fi\n" +
-                                 "for arg in \"\$@\"; do\n" +
-                                 "  COMMAND+=(\"-e\" \"\${arg%%:*}\" \"\${arg#*:}\")\n" +
-                                 "done\n" +
-                                 "\"\${COMMAND[@]}\"\n"
     while (entries.hasMoreElements()) {
         java.util.zip.ZipEntry entry = entries.nextElement()
         InputStream is = zf.getInputStream(entry)
@@ -309,12 +322,9 @@ def patchBootstrapMotd(File zipFile) {
         } else if (!entry.isDirectory() && entry.name.endsWith("bin/termux-setup-microphone")) {
             hasSetupMicrophone = true
             data = trSetupMicrophone.getBytes(java.nio.charset.StandardCharsets.UTF_8)
-        } else if (!entry.isDirectory() && entry.name.endsWith("bin/termux-x11")) {
-            hasTermuxX11 = true
-            data = termuxX11Script.getBytes(java.nio.charset.StandardCharsets.UTF_8)
-        } else if (!entry.isDirectory() && entry.name.endsWith("bin/termux-x11-preference")) {
-            hasTermuxX11Pref = true
-            data = termuxX11PrefScript.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        } else if (!entry.isDirectory() && (entry.name == "bin/mksh" || entry.name.endsWith("/bin/mksh"))) {
+            hasMksh = true
+            data = mkshBytes
         }
 
         java.util.zip.ZipEntry newEntry = new java.util.zip.ZipEntry(entry.name)
@@ -329,51 +339,11 @@ def patchBootstrapMotd(File zipFile) {
         zos.write(trSetupMicrophone.getBytes(java.nio.charset.StandardCharsets.UTF_8))
         zos.closeEntry()
     }
-    if (!hasTermuxX11) {
-        java.util.zip.ZipEntry x11Entry = new java.util.zip.ZipEntry("bin/termux-x11")
-        zos.putNextEntry(x11Entry)
-        zos.write(termuxX11Script.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+    if (!hasMksh) {
+        java.util.zip.ZipEntry mkshEntry = new java.util.zip.ZipEntry("bin/mksh")
+        zos.putNextEntry(mkshEntry)
+        zos.write(mkshBytes)
         zos.closeEntry()
-    }
-    if (!hasTermuxX11Pref) {
-        java.util.zip.ZipEntry x11PrefEntry = new java.util.zip.ZipEntry("bin/termux-x11-preference")
-        zos.putNextEntry(x11PrefEntry)
-        zos.write(termuxX11PrefScript.getBytes(java.nio.charset.StandardCharsets.UTF_8))
-        zos.closeEntry()
-    }
-
-    // Bundle XKB keyboard layout data (share/X11/xkb) directly from build host (/usr/share/X11/xkb) so X11 works offline without external packages
-    File hostXkbDir = new File("/usr/share/X11/xkb")
-    if (!hostXkbDir.exists()) {
-        hostXkbDir = new File("/data/data/com.termux/files/usr/share/X11/xkb")
-    }
-    if (hostXkbDir.exists() && hostXkbDir.isDirectory()) {
-        File assetsDir = new File(projectDir, "src/main/assets")
-        assetsDir.mkdirs()
-        File xkbAssetZip = new File(assetsDir, "xkb.zip")
-        java.util.zip.ZipOutputStream xkbAssetZos = new java.util.zip.ZipOutputStream(new BufferedOutputStream(new FileOutputStream(xkbAssetZip)))
-        String basePath = hostXkbDir.absolutePath
-        Set<String> seenXkbEntries = new HashSet<>()
-        hostXkbDir.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
-            String relSubPath = f.absolutePath.substring(basePath.length() + 1).replace('\\', '/')
-            String zipEntryPath = "share/X11/xkb/" + relSubPath
-            if (seenXkbEntries.add(zipEntryPath)) {
-                byte[] fbytes = f.bytes
-
-                java.util.zip.ZipEntry ze1 = new java.util.zip.ZipEntry(zipEntryPath)
-                zos.putNextEntry(ze1)
-                zos.write(fbytes)
-                zos.closeEntry()
-
-                java.util.zip.ZipEntry ze2 = new java.util.zip.ZipEntry(zipEntryPath)
-                xkbAssetZos.putNextEntry(ze2)
-                xkbAssetZos.write(fbytes)
-                xkbAssetZos.closeEntry()
-            }
-        }
-        xkbAssetZos.close()
-    } else {
-        throw new GradleException("Host XKB directory (/usr/share/X11/xkb) not found! Install xkb-data on the build host.")
     }
 
     zos.close()
@@ -382,13 +352,13 @@ def patchBootstrapMotd(File zipFile) {
     if (!tempFile.renameTo(zipFile)) {
         throw new GradleException("Failed to rename patched bootstrap zip file")
     }
-    logger.quiet("Patched bootstrap zip (" + zipFile.name + ") with custom Turkish MOTD banner, termux-setup-storage, termux-setup-microphone, termux-x11 and xkeyboard-config")
+    logger.quiet("Patched bootstrap zip (" + zipFile.name + ") with custom Turkish MOTD banner, termux-setup-storage, termux-setup-microphone and mksh")
 }
 
 def downloadBootstrap(String arch, String expectedChecksum, String version) {
     def localUrl = "src/main/cpp/bootstrap-" + arch + ".zip"
     def file = new File(projectDir, localUrl)
-    def patchedMarker = new File(projectDir, "src/main/cpp/bootstrap-" + arch + ".patched3")
+    def patchedMarker = new File(projectDir, "src/main/cpp/bootstrap-" + arch + ".patched4")
     if (file.exists() && patchedMarker.exists()) {
         return
     }
@@ -406,7 +376,7 @@ def downloadBootstrap(String arch, String expectedChecksum, String version) {
         def checksum = new BigInteger(1, digest.digest()).toString(16)
         while (checksum.length() < 64) { checksum = "0" + checksum }
         if (checksum == expectedChecksum) {
-            patchBootstrapMotd(file)
+            patchBootstrapMotd(file, arch)
             patchedMarker.text = "patched"
             return
         } else {
@@ -436,7 +406,7 @@ def downloadBootstrap(String arch, String expectedChecksum, String version) {
         throw new GradleException("Wrong checksum for " + remoteUrl + ": expected: " + expectedChecksum + ", actual: " + checksum)
     }
 
-    patchBootstrapMotd(file)
+    patchBootstrapMotd(file, arch)
     patchedMarker.text = "patched"
 }
 
@@ -445,6 +415,7 @@ clean {
         def tree = fileTree(new File(projectDir, 'src/main/cpp'))
         tree.include 'bootstrap-*'
         tree.each { it.delete() }
+        new File(projectDir, 'src/main/cpp/.mksh-cache').deleteDir()
     }
 }
 
@@ -454,6 +425,7 @@ task downloadBootstraps() {
         if (packageVariant == "apt-android-7") {
             def version = "2026.02.12-r1" + "%2B" + "apt.android-7"
             downloadBootstrap("aarch64", "ea2aeba8819e517db711f8c32369e89e7c52cee73e07930ff91185e1ab93f4f3", version)
+            downloadBootstrap("arm", "a38f4d3b2f735f83be2bf54eff463e86dc32a3e2f9f861c1557c4378d249c018", version)
         } else if (packageVariant == "apt-android-5") {
             def version = "2022.04.28-r6" + "%2B" + packageVariant
             downloadBootstrap("aarch64", "913609d439415c828c5640be1b0561467e539cb1c7080662decaaca2fb4820e7", version)

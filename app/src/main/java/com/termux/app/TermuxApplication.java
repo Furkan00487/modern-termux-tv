@@ -1,13 +1,22 @@
 package com.termux.app;
 
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Process;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.termux.BuildConfig;
 import com.termux.shared.errors.Error;
 import com.termux.shared.logger.Logger;
 import com.termux.shared.termux.TermuxBootstrap;
 import com.termux.shared.termux.TermuxConstants;
+import com.termux.shared.termux.TermuxConstants.TERMUX_APP.TERMUX_SERVICE;
 import com.termux.shared.termux.crash.TermuxCrashUtils;
 import com.termux.shared.termux.file.TermuxFileUtils;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
@@ -16,16 +25,56 @@ import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment
 import com.termux.shared.termux.shell.am.TermuxAmSocketServer;
 import com.termux.shared.termux.shell.TermuxShellManager;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
-import com.termux.x11.LorieApp;
 
-public class TermuxApplication extends LorieApp {
+public class TermuxApplication extends Application {
 
     private static final String LOG_TAG = "TermuxApplication";
+    private int mStartedActivityCount = 0;
 
     public void onCreate() {
         super.onCreate();
 
         Context context = getApplicationContext();
+
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
+            }
+
+            @Override
+            public void onActivityStarted(@NonNull Activity activity) {
+                mStartedActivityCount++;
+            }
+
+            @Override
+            public void onActivityResumed(@NonNull Activity activity) {
+            }
+
+            @Override
+            public void onActivityPaused(@NonNull Activity activity) {
+            }
+
+            @Override
+            public void onActivityStopped(@NonNull Activity activity) {
+                mStartedActivityCount = Math.max(0, mStartedActivityCount - 1);
+                if (ExitKillPolicy.shouldKillProcess(
+                        ExitKillPolicy.isTelevisionDevice(context),
+                        getExitKillProcessOverride(context),
+                        ExitKillPolicy.ExitReason.BACKGROUNDED,
+                        mStartedActivityCount,
+                        activity.isChangingConfigurations())) {
+                    terminateTermuxProcessNow(context, activity);
+                }
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) {
+            }
+
+            @Override
+            public void onActivityDestroyed(@NonNull Activity activity) {
+            }
+        });
 
         // Set crash handler for the app
         TermuxCrashUtils.setDefaultCrashHandler(this);
@@ -72,8 +121,40 @@ public class TermuxApplication extends LorieApp {
 
         if (isTermuxFilesDirectoryAccessible) {
             TermuxShellEnvironment.writeEnvironmentToFile(this);
-            TermuxInstaller.ensureTermuxX11FilesExist(this);
             TermuxInstaller.ensureTermuxMotdRefreshScriptExists();
+            TermuxInstaller.ensureDefaultShellIsMksh();
+        }
+    }
+
+    @Nullable
+    public static Boolean getExitKillProcessOverride(@NonNull Context context) {
+        TermuxAppSharedPreferences preferences = TermuxAppSharedPreferences.build(context);
+        return preferences != null ? preferences.getExitKillProcessOverride() : null;
+    }
+
+    public static void terminateTermuxProcessNow(@NonNull Context context, @Nullable Activity activity) {
+        if (activity != null && !activity.isFinishing()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                activity.finishAndRemoveTask();
+            } else {
+                activity.finish();
+            }
+        }
+
+        TermuxService service = TermuxService.getInstance();
+        if (service != null) {
+            service.forceStopAndKillProcess();
+            return;
+        }
+
+        Intent stopIntent = new Intent(context, TermuxService.class)
+            .setAction(TERMUX_SERVICE.ACTION_STOP_SERVICE)
+            .putExtra(TermuxService.EXTRA_KILL_APP_PROCESS, true);
+        try {
+            context.startService(stopIntent);
+        } catch (Exception e) {
+            Process.killProcess(Process.myPid());
+            System.exit(0);
         }
     }
 
@@ -84,18 +165,6 @@ public class TermuxApplication extends LorieApp {
         TermuxAppSharedPreferences preferences = TermuxAppSharedPreferences.build(context);
         if (preferences == null) return;
         preferences.setLogLevel(null, preferences.getLogLevel());
-    }
-
-    @Override
-    public void onActivityResumed(com.termux.x11.MainActivity activity) {
-        super.onActivityResumed(activity);
-        TermuxService.setX11Active(true, this);
-    }
-
-    @Override
-    public void onActivityPaused() {
-        super.onActivityPaused();
-        TermuxService.setX11Active(false, this);
     }
 
 }

@@ -13,6 +13,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
 import com.termux.R;
+import com.termux.app.ExitKillPolicy;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 import com.termux.shared.logger.Logger;
 
@@ -132,6 +133,9 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
             case "crash_report_notifications_enabled":
                 mPreferences.setCrashReportNotificationsEnabled(value);
                 break;
+            case "exit_kill_process_enabled":
+                mPreferences.setExitKillProcessEnabled(value);
+                break;
             default:
                 break;
         }
@@ -147,6 +151,8 @@ class DebuggingPreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.arePluginErrorNotificationsEnabled(false);
             case "crash_report_notifications_enabled":
                 return mPreferences.areCrashReportNotificationsEnabled(false);
+            case "exit_kill_process_enabled":
+                return mPreferences.isExitKillProcessEnabled(ExitKillPolicy.isTelevisionDevice(mContext));
             default:
                 return false;
         }

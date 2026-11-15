@@ -250,4 +250,15 @@
     <string name="action_paste_as_spaces">Boşluk Olarak Yapıştır</string>
     <string name="action_cancel">İptal</string>
 
+    <!-- TV Low RAM Warning & Immediate Exit Termination -->
+    <string name="title_low_ram_warning">Düşük RAM Uyarısı (&lt; 2 GiB)</string>
+    <string name="msg_low_ram_warning">Bu cihazda toplam %1$s RAM algılandı (2 GiB altında).\n\nAğır işlemler sistem tarafından bellek yetersizliği nedeniyle kapatılabilir. RAM tasarrufu için Modern Termux TV uygulamadan çıkıldığında veya arka plana geçildiğinde işlemini anında sonlandırır.</string>
+    <string name="action_ok">Tamam</string>
+    <string name="action_dont_show_again">Bir daha gösterme</string>
+
+    <string name="termux_tv_power_header">TV ve Bellek Yönetimi</string>
+    <string name="termux_exit_kill_process_title">Çıkışta işlemi anında sonlandır</string>
+    <string name="termux_exit_kill_process_on">Uygulamadan çıkıldığında veya arka plana geçildiğinde Termux işlemi anında sonlandırılır. (Android TV varsayılanı)</string>
+    <string name="termux_exit_kill_process_off">Uygulamadan çıkıldığında arka plan oturumları açık kalır.</string>
+
 </resources>

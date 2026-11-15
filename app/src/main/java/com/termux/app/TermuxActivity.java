@@ -173,6 +173,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      */
     private boolean mIsInvalidState;
 
+    private boolean mHasCheckedLowRamWarning = false;
+
     private int mNavBarHeight;
 
     private float mTerminalToolbarDefaultHeight;
@@ -406,6 +408,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                             launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
                         }
                         mTermuxTerminalSessionActivityClient.addNewSession(launchFailsafe, null);
+                        maybeShowLowRamWarningDialog();
                     } catch (WindowManager.BadTokenException e) {
                         // Activity finished - ignore.
                     }
@@ -425,6 +428,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             } else {
                 mTermuxTerminalSessionActivityClient.setCurrentSession(mTermuxTerminalSessionActivityClient.getCurrentStoredSessionOrLast());
             }
+            maybeShowLowRamWarningDialog();
         }
 
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
@@ -570,19 +574,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         settingsButton.setOnClickListener(v -> {
             ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
         });
-
-        View x11Button = findViewById(R.id.x11_button);
-        if (x11Button != null) {
-            x11Button.setOnClickListener(v -> {
-                getDrawer().closeDrawers();
-                ActivityUtils.startActivity(this, new Intent(this, com.termux.x11.MainActivity.class));
-            });
-            x11Button.setOnLongClickListener(v -> {
-                getDrawer().closeDrawers();
-                ActivityUtils.startActivity(this, new Intent(this, com.termux.x11.LoriePreferences.class));
-                return true;
-            });
-        }
     }
 
     private void setNewSessionButtonView() {
@@ -618,8 +609,48 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     public void onBackPressed() {
         if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
             getDrawer().closeDrawers();
+        } else if (shouldAutoKillProcessOnExit(ExitKillPolicy.ExitReason.BACK_PRESSED)) {
+            TermuxApplication.terminateTermuxProcessNow(this, this);
         } else {
             finishActivityIfNotFinishing();
+        }
+    }
+
+    public boolean shouldAutoKillProcessOnExit(@NonNull ExitKillPolicy.ExitReason reason) {
+        Boolean userOverride = mPreferences != null ? mPreferences.getExitKillProcessOverride() : null;
+        return ExitKillPolicy.shouldKillProcess(
+            ExitKillPolicy.isTelevisionDevice(this),
+            userOverride,
+            reason,
+            0,
+            isChangingConfigurations());
+    }
+
+    private void maybeShowLowRamWarningDialog() {
+        if (mHasCheckedLowRamWarning || mPreferences == null || isFinishing() || isDestroyed()) {
+            return;
+        }
+        mHasCheckedLowRamWarning = true;
+
+        long totalMemBytes = LowRamPolicy.getTotalDeviceMemoryBytes(this);
+        if (!LowRamPolicy.shouldShowWarning(totalMemBytes, mPreferences.isLowRamWarningDismissed())) {
+            return;
+        }
+
+        String formattedMem = LowRamPolicy.formatMemorySize(totalMemBytes);
+        try {
+            new AlertDialog.Builder(this)
+                .setTitle(R.string.title_low_ram_warning)
+                .setMessage(getString(R.string.msg_low_ram_warning, formattedMem))
+                .setPositiveButton(R.string.action_ok, null)
+                .setNeutralButton(R.string.action_dont_show_again, (dialog, which) -> {
+                    if (mPreferences != null) {
+                        mPreferences.setLowRamWarningDismissed(true);
+                    }
+                })
+                .show();
+        } catch (WindowManager.BadTokenException ignored) {
+            // Activity already dismissed - ignore.
         }
     }
 

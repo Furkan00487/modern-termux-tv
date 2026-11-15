@@ -17,6 +17,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.termux.R;
+import com.termux.app.ExitKillPolicy;
+import com.termux.app.TermuxApplication;
 import com.termux.shared.interact.ShareUtils;
 import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.shared.termux.interact.TextInputDialogUtils;
@@ -446,7 +448,11 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         int size = service.getTermuxSessionsSize();
         if (size == 0) {
             // There are no sessions to show, so finish the activity.
-            mActivity.finishActivityIfNotFinishing();
+            if (mActivity.shouldAutoKillProcessOnExit(ExitKillPolicy.ExitReason.LAST_SESSION_FINISHED)) {
+                TermuxApplication.terminateTermuxProcessNow(mActivity, mActivity);
+            } else {
+                mActivity.finishActivityIfNotFinishing();
+            }
         } else {
             if (index >= size) {
                 index = size - 1;

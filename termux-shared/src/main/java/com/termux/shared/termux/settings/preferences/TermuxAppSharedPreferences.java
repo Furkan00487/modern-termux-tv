@@ -258,4 +258,29 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_CRASH_REPORT_NOTIFICATIONS_ENABLED, value, false);
     }
 
+    public boolean isLowRamWarningDismissed() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_LOW_RAM_WARNING_DISMISSED, TERMUX_APP.DEFAULT_VALUE_LOW_RAM_WARNING_DISMISSED);
+    }
+
+    public void setLowRamWarningDismissed(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_LOW_RAM_WARNING_DISMISSED, value, false);
+    }
+
+    @Nullable
+    public Boolean getExitKillProcessOverride() {
+        if (mSharedPreferences == null || !mSharedPreferences.contains(TERMUX_APP.KEY_EXIT_KILL_PROCESS_ENABLED)) {
+            return null;
+        }
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_EXIT_KILL_PROCESS_ENABLED, false);
+    }
+
+    public boolean isExitKillProcessEnabled(boolean defaultForDevice) {
+        Boolean override = getExitKillProcessOverride();
+        return override != null ? override : defaultForDevice;
+    }
+
+    public void setExitKillProcessEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_EXIT_KILL_PROCESS_ENABLED, value, false);
+    }
+
 }

@@ -105,10 +105,18 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
     /** If the user has executed the {@link TERMUX_SERVICE#ACTION_STOP_SERVICE} intent. */
     boolean mWantsToStop = false;
 
+    public static final String EXTRA_KILL_APP_PROCESS = TermuxConstants.TERMUX_PACKAGE_NAME + ".service_kill_app_process";
+
+    private static volatile TermuxService sInstance;
+
+    private boolean mCleanedUpForExit = false;
+
     private static final String LOG_TAG = "TermuxService";
 
-    private static volatile boolean sX11Active = false;
-    private static TermuxService sInstance;
+    @Nullable
+    public static TermuxService getInstance() {
+        return sInstance;
+    }
 
     @Override
     public void onCreate() {
@@ -144,7 +152,14 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
             switch (action) {
                 case TERMUX_SERVICE.ACTION_STOP_SERVICE:
                     Logger.logDebug(LOG_TAG, "ACTION_STOP_SERVICE intent received");
-                    actionStopService();
+                    boolean killAppProcess = (intent != null && intent.getBooleanExtra(EXTRA_KILL_APP_PROCESS, false)) ||
+                        ExitKillPolicy.shouldKillProcess(
+                            ExitKillPolicy.isTelevisionDevice(this),
+                            TermuxApplication.getExitKillProcessOverride(this),
+                            ExitKillPolicy.ExitReason.NOTIFICATION_STOP,
+                            0,
+                            false);
+                    actionStopService(killAppProcess);
                     break;
                 case TERMUX_SERVICE.ACTION_WAKE_LOCK:
                     Logger.logDebug(LOG_TAG, "ACTION_WAKE_LOCK intent received");
@@ -174,6 +189,28 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         Logger.logVerbose(LOG_TAG, "onDestroy");
         sInstance = null;
 
+        performExitCleanup();
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Logger.logDebug(LOG_TAG, "onTaskRemoved");
+        if (ExitKillPolicy.shouldKillProcess(
+                ExitKillPolicy.isTelevisionDevice(this),
+                TermuxApplication.getExitKillProcessOverride(this),
+                ExitKillPolicy.ExitReason.TASK_REMOVED,
+                0,
+                false)) {
+            forceStopAndKillProcess();
+            return;
+        }
+        super.onTaskRemoved(rootIntent);
+    }
+
+    private synchronized void performExitCleanup() {
+        if (mCleanedUpForExit) return;
+        mCleanedUpForExit = true;
+
         TermuxShellUtils.clearTermuxTMPDIR(true);
 
         actionReleaseWakeLock(false);
@@ -185,6 +222,10 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         SystemEventReceiver.unregisterPackageUpdateEvents(this);
 
         runStopForeground();
+    }
+
+    public void forceStopAndKillProcess() {
+        actionStopService(true);
     }
 
     @Override
@@ -224,10 +265,16 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
     }
 
     /** Process action to stop service. */
-    private void actionStopService() {
+    private void actionStopService(boolean killAppProcess) {
         mWantsToStop = true;
         killAllTermuxExecutionCommands();
         requestStopService();
+        if (killAppProcess) {
+            performExitCleanup();
+            sInstance = null;
+            android.os.Process.killProcess(android.os.Process.myPid());
+            System.exit(0);
+        }
     }
 
     /** Kill all TermuxSessions and TermuxTasks by sending SIGKILL to their processes.
@@ -821,8 +868,8 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         // No need to show a timestamp:
         builder.setShowWhen(false);
 
-        // Set notification icon (switches dynamically to X11 icon when X11 activity is active)
-        builder.setSmallIcon(sX11Active ? com.termux.x11.R.drawable.ic_x11_icon : R.drawable.ic_service_notification);
+        // Set notification icon
+        builder.setSmallIcon(R.drawable.ic_service_notification);
 
         // Set background color for small notification icon (Modern Termux Cyan)
         builder.setColor(0xFF00E5FF);
@@ -862,27 +909,6 @@ public final class TermuxService extends Service implements AppShell.AppShellCli
         } else {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(TermuxConstants.TERMUX_APP_NOTIFICATION_ID, buildNotification());
         }
-    }
-
-    /**
-     * Dynamically update X11 active state and update the foreground notification icon if changed.
-     *
-     * @param active Whether X11 activity is currently active/resumed.
-     * @param context Context for updating notification or null.
-     */
-    public static synchronized void setX11Active(boolean active, Context context) {
-        if (sX11Active == active) return;
-        sX11Active = active;
-        if (sInstance != null) {
-            sInstance.updateNotification();
-        }
-    }
-
-    /**
-     * Check whether X11 is currently active.
-     */
-    public static boolean isX11Active() {
-        return sX11Active;
     }
 
 

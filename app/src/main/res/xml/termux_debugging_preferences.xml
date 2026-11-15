@@ -30,4 +30,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory
+        app:key="tv_power"
+        app:title="@string/termux_tv_power_header">
+
+        <SwitchPreferenceCompat
+            app:key="exit_kill_process_enabled"
+            app:summaryOff="@string/termux_exit_kill_process_off"
+            app:summaryOn="@string/termux_exit_kill_process_on"
+            app:title="@string/termux_exit_kill_process_title" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>

@@ -186,6 +186,17 @@ public final class TermuxPreferenceConstants {
         public static final String KEY_CRASH_REPORT_NOTIFICATIONS_ENABLED = "crash_report_notifications_enabled";
         public static final boolean DEFAULT_VALUE_CRASH_REPORT_NOTIFICATIONS_ENABLED = true;
 
+        /**
+         * Defines the key for whether the low RAM (&lt; 2 GiB) warning dialog has been dismissed.
+         */
+        public static final String KEY_LOW_RAM_WARNING_DISMISSED = "low_ram_warning_dismissed";
+        public static final boolean DEFAULT_VALUE_LOW_RAM_WARNING_DISMISSED = false;
+
+        /**
+         * Defines the key for whether Modern Termux TV immediately kills its process on exit or background.
+         */
+        public static final String KEY_EXIT_KILL_PROCESS_ENABLED = "exit_kill_process_enabled";
+
     }
 
 

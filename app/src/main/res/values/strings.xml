@@ -260,4 +260,15 @@
     <string name="action_paste_as_spaces">Paste as Spaces</string>
     <string name="action_cancel">Cancel</string>
 
+    <!-- TV Low RAM Warning & Immediate Exit Termination -->
+    <string name="title_low_ram_warning">Low Memory Warning (&lt; 2 GiB RAM)</string>
+    <string name="msg_low_ram_warning">This device reports %1$s of total RAM, which is under 2 GiB.\n\nHeavy tasks or graphical environments may be terminated by Android TV due to low memory. To save RAM, Modern Termux TV automatically terminates its process upon exit or leaving to the background.</string>
+    <string name="action_ok">OK</string>
+    <string name="action_dont_show_again">Don\'t show again</string>
+
+    <string name="termux_tv_power_header">TV &amp; Memory Management</string>
+    <string name="termux_exit_kill_process_title">Terminate process immediately on exit</string>
+    <string name="termux_exit_kill_process_on">All terminal processes will be terminated immediately when exiting or moving to background. (Default on Android TV)</string>
+    <string name="termux_exit_kill_process_off">Background sessions will remain alive after leaving the app.</string>
+
 </resources>

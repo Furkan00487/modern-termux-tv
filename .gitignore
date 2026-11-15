@@ -50,3 +50,7 @@ Thumbs.db
 docs/superpowers/
 .superpowers/
 .worktrees/
+
+# Cached Termux bootstraps and mksh binaries
+app/src/main/cpp/.mksh-cache/
+app/src/main/cpp/bootstrap-*
