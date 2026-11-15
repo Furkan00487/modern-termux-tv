@@ -1,15 +1,15 @@
-# Modern Termux
+# Modern Termux TV
 
-[![Sürüm](https://img.shields.io/github/v/release/Furkan00487/modern-termux?label=s%C3%BCr%C3%BCm&color=00E5FF)](https://github.com/Furkan00487/modern-termux/releases/latest)
-[![Release Derleme](https://github.com/Furkan00487/modern-termux/actions/workflows/release_build.yml/badge.svg)](https://github.com/Furkan00487/modern-termux/actions/workflows/release_build.yml)
-[![Birim Testleri](https://github.com/Furkan00487/modern-termux/actions/workflows/run_tests.yml/badge.svg)](https://github.com/Furkan00487/modern-termux/actions/workflows/run_tests.yml)
+[![Sürüm](https://img.shields.io/github/v/release/Furkan00487/modern-termux-tv?label=s%C3%BCr%C3%BCm&color=00E5FF)](https://github.com/Furkan00487/modern-termux-tv/releases/latest)
+[![Release Derleme](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/release_build.yml/badge.svg)](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/release_build.yml)
+[![Birim Testleri](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/run_tests.yml/badge.svg)](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/run_tests.yml)
 [![Lisans: GPL v3](https://img.shields.io/badge/lisans-GPL--3.0-blue.svg)](LICENSE)
 
 🌐 **[English](README.md)** | **[Türkçe](README.tr.md)**
 
 ---
 
-**Modern Termux**, [Termux](https://github.com/termux/termux-app) Android terminal emülatörü ve Linux ortamının gelişmiş bir çatalıdır (fork). Dahili X11 grafik desteği, sıfır boşta CPU tüketimi sağlayan olay güdümlü yaşam döngüsü, çekmecede özel X11 kısayolları, kullanıma hazır ses ve mikrofon altyapısı ve resmi imzalı kararlı sürüm paketleriyle birlikte gelir.
+**Modern Termux TV**, [Termux](https://github.com/termux/termux-app) Android terminal emülatörünün ve Linux ortamının **Android TV** odaklı gelişmiş bir çatalıdır (fork). **Jetpack Compose for TV** arayüzü, eksiksiz kumanda (D-Pad) gezinme desteği, varsayılan **`mksh`** kabuğu, düşük RAM (`< 2 GiB`) uyarısı ve TV bellek koruması, kullanıma hazır ses/mikrofon altyapısı ve çift mimarili (**`arm64-v8a`** / **`armeabi-v7a`**) resmi imzalı kararlı sürüm paketleriyle birlikte gelir.
 
 > Bu proje, [termux/termux-app](https://github.com/termux/termux-app) projesinin bir çatalıdır. Terminal emülasyon motoru, Linux kabuk ortamı ve paket ekosistemi orijinal upstream Termux projesine ve katkıda bulunanlarına aittir.
 
@@ -17,11 +17,10 @@
 
 ## İçindekiler
 
-- [Neden Modern Termux?](#neden-modern-termux)
+- [Neden Modern Termux TV?](#neden-modern-termux-tv)
 - [Temel Özellikler](#temel-özellikler)
-- [Hızlı Başlangıç: X11 Grafik Masaüstü](#hızlı-başlangıç-x11-grafik-masaüstü)
+- [TV Kumandası ve D-Pad Kontrolleri](#tv-kumandası-ve-d-pad-kontrolleri)
 - [Ses ve Mikrofon Yapılandırması](#ses-ve-mikrofon-yapılandırması)
-- [Kullanıcı Arayüzü ve Çekmece Kısayolları](#kullanıcı-arayüzü-ve-çekmece-kısayolları)
 - [Dahili CLI Komutları](#dahili-cli-komutları)
 - [Kurulum](#kurulum)
 - [İndirilen Dosyayı Doğrulama](#indirilen-dosyayı-doğrulama)
@@ -34,73 +33,48 @@
 
 ---
 
-## Neden Modern Termux?
+## Neden Modern Termux TV?
 
-| Yetenek / Özellik | Standart Termux | Modern Termux |
+| Yetenek / Özellik | Standart Termux | Modern Termux TV |
 | :--- | :--- | :--- |
-| **X11 Grafik Desteği** | Ayrı bir Termux:X11 APK'sı kurmayı gerektirir | **Tek uygulamada dahili `:x11` motoru** |
-| **Durum Çubuğu İkonu** | Sabit terminal ikonu (`>_`) | **Dinamik ikon**: Grafik ekrandayken otomatik `X_` olur, terminalde `>_` simgesine döner |
-| **Pil ve İşlemci Verimliliği** | 200 ms aralıklı `serverWatchdog` döngüsüyle işlemciyi sürekli uyandırır | **Olay güdümlü (Event-driven)**: Watchdog kaldırıldı, %0 arka plan yükü |
-| **X11 Yönetimi ve Ayarlar** | Manuel geçiş, ayrı uygulama ayar menüsü | **Çekmecede tek tıkla geçiş** + **Uzun basarak anında ayarlar** |
-| **Klavye Düzenleri (XKB)** | Harici paket kurulumu veya manuel ayar gerektirir | **Dahili XKB arşivi (`xkb.zip`)** ilk açılışta otomatik kurulur |
+| **Android TV Arayüzü** | Eski telefon View ve `ListView` çekmecesi | **Leanback TV desteği + Jetpack Compose for TV** (`androidx.tv:tv-material`) |
+| **Kumanda (D-Pad) Gezinme** | TV kontrol çubuğu veya kaydırma modu yok | **Üst TV Kontrol Çubuğu, Kaydırma Modu, D-Pad Alt Tuşlar, odak kilitli Çekmece** |
+| **Düşük RAM TV Koruması** | Çıkış/arka plan sonrası bellekte kalır | **< 2 GiB RAM uyarı katmanı** + **TV çıkış/arka plan otomatik sonlandırma** |
+| **Varsayılan Kabuk** | `bash` | **Dahili `mksh` (`mksh_59c-5`)**, otomatik `~/.termux/shell` bağlantısıyla |
+| **TV Mimarileri** | Genel paketleme | **Ayrı imzalı `arm64-v8a` (64-bit) ve `armeabi-v7a` (32-bit TV'ler)** |
 | **Mikrofon ve Ses** | İzin sorunları, harici script arayışı | **Doğrudan `RECORD_AUDIO` izni** + `termux-setup-microphone` scripti |
-| **Görsel Tema ve Vurgu** | Standart koyu gri/siyah tema | **Neon Camgöbeği (`#00E5FF`)** modern tema ve simgeler |
+| **Görsel Tema ve Vurgu** | Standart koyu gri/siyah tema | **Koyu Teal (`#80CBC4` / `#0E1113`) Compose TV UI** + **Cyber Midnight (`#00E5FF`) imleç ve bildirim** |
 | **Paket İmzası** | Genellikle imzasız veya genel test anahtarlarıyla sunulur | **GitHub Actions üzerinde** özel Release Keystore ile çift imzalı (v2 & v3) |
-| **Açılış Mesajı (MOTD)** | Standart İngilizce metin | **Modern Türkçe MOTD**, her sürüm yükseltmesinde otomatik eşitlenir |
+| **Açılış Mesajı (MOTD)** | Standart İngilizce metin | **Modern Türkçe MOTD**, her sürüm yükseltmesinde otomatik eşitlenir + `termux-motd-refresh` |
 
 ---
 
 ## Temel Özellikler
 
-- **Dahili X11 Ekran Sunucusu:** Termux:X11 motoru doğrudan uygulamanın içerisine gömülmüştür. Yan uygulama kurma, izin karmaşası veya imza uyuşmazlığı yaşanmaz.
-- **Dinamik Bildirim Çubuğu Simgesi:** Kalıcı servis bildirimi mevcut çalışma alanınızı gösterir: X11 ekranı aktifken Neon Cyan `X_`, terminal oturumlarında ise Neon Cyan `>_` simgesi görüntülenir.
-- **Pil Dostu Olay Güdümlü Yaşam Döngüsü:** Termux:X11'deki işlemciyi yoran 200 milisaniyelik `serverWatchdog` yoklama döngüsü tamamen kaldırılmıştır. `onActivityResumed` ve `onActivityPaused` yaşam döngüsüyle sıfır ek yükle çalışır.
+- **Jetpack Compose for TV Arayüzü:** TV üzerindeki eski XML çekmece, ayar ve diyalog görünümlerinin yerini Compose Material 3 bileşenleri (`TerminalDrawerPanel`, `TvTerminalActionBar`, `TvSettingsScreen` ve `LowRamWarningOverlay`) alır.
+- **Leanback ve Kumanda Odaklılık:** `LEANBACK_LAUNCHER`, TV afişi ve isteğe bağlı dokunmatik ekran desteğiyle (`required="false"`) uygulamanın baştan sona TV kumandasıyla kullanılmasını sağlar.
+- **Bellek Dostu TV Yaşam Döngüsü:** Toplam RAM'i `2 GiB` altında olan cihazlarda kapatılabilir uyarı diyaloğu gösterir; TV cihazlarında çıkışta veya arka plana geçişte işlemi otomatik sonlandırır (`ExitKillPolicy`, **Termux Hata Ayıklama** ayarlarından yönetilebilir).
+- **Dahili `mksh` Varsayılan Kabuğu:** `mksh_59c-5` ikili dosyasını doğrulanmış biçimde bootstrap içerisine paketler ve `~/.termux/shell` -> `$PREFIX/bin/mksh` olarak bağlar.
 - **Kullanıma Hazır Ses ve Mikrofon:** Uygulama `RECORD_AUDIO` iznine sahiptir; ses kaydı ve çalma işlemleri için `termux-setup-microphone` komutu dahili olarak sunulur.
-- **Önceden Paketlenmiş XKB Klavye Yapılandırması:** X11 klavye haritaları doğrudan varlıklar (assets) içerisine gömülmüştür ve `$PREFIX/share/` altına otomatik açılır.
-- **İmzalı ve Güvenli Tekil Sürümler:** Her sürüm GitHub Actions üzerinde arm64-v8a mimarisine özel olarak derlenir ve v2/v3 şemalarıyla doğrulanır.
+- **İmzalı Çift Mimarili Sürümler:** Her sürüm GitHub Actions üzerinde hem `arm64-v8a` hem de `armeabi-v7a` mimarilerine özel derlenir ve v2/v3 şemalarıyla imzalanıp doğrulanır.
 
 ---
 
-## Hızlı Başlangıç: X11 Grafik Masaüstü
+## TV Kumandası ve D-Pad Kontrolleri
 
-Modern Termux ile XFCE4 gibi tam donanımlı Linux masaüstü ortamlarını doğrudan çalıştırabilirsiniz.
+Modern Termux TV'yi yalnızca TV kumandasıyla rahatça yönetebilirsiniz:
 
-### 1. Masaüstü Ortamını Kurun
-
-Terminalde şu komutları çalıştırın:
-
-```bash
-pkg update
-pkg install xfce4 xfce4-terminal
-```
-
-### 2. Dahili X11 Sunucusunu Başlatın
-
-X11 sunucusunu arka planda başlatın:
-
-```bash
-termux-x11 :0 &
-```
-
-### 3. Masaüstü Oturumunu Çalıştırın
-
-Ekran değişkenini tanımlayın ve XFCE oturumunu başlatın:
-
-```bash
-export DISPLAY=:0
-startxfce4 &
-```
-
-### 4. Grafik Ekrana Geçin
-
-- Ekranın sol kenarından sağa doğru kaydırarak **Gezinme Çekmecesini (Drawer)** açın.
-- Masaüstü ortamınıza anında geçmek için Neon Cyan **X11 butonuna** (`X_`) dokunun.
+- **Kısa `OK` (`DPAD_CENTER`):** Normal terminal ekranında sanal klavyeyi açar/geri getirir (alternatif ekran uygulamalarında veya klavye zaten açıksa `Enter` `\r` gönderir).
+- **Uzun `OK` veya `MENU`:** Odağı **Üst TV Kontrol Çubuğu**na taşır (`Oturumlar`, `Klavye`, `Alt Tuşlar`, `Kaydır`, `Yukarı/Aşağı Kaydır`, `Menü`, `Ayarlar`). `Geri`, `ESC` veya `Aşağı` tuşu odağı terminale geri döndürür.
+- **Üst Çubuk -> `Alt Tuşlar`:** Odağı alt ekstra tuşlar çubuğuna (`ESC`, `TAB`, `HOME`, `CTRL`, `ALT`, oklar, `PGUP`/`PGDN`) belirgin odak vurgusuyla taşır; üst satırdan `Yukarı` veya `Geri` ile terminale dönersiniz.
+- **Kaydırma Modu (`Kaydır` veya `CH+` / `CH-`):** Terminal geçmişini yukarı/aşağı kaydırır; Kaydırma Modunda `Sol` ok Oturumlar çekmecesini açar, `OK` / `Geri` moddan çıkar.
+- **Oturumlar Çekmecesi (`Oturumlar`):** Odağı içeride kilitleyen Compose çekmecesiyle oturum değiştirme, adlandırma/kapatma, Adlı/Güvenli oturum açma, klavye/araç çubuğu ve Ayarlar (`⚙`) yönetimi yapılabilir.
 
 ---
 
 ## Ses ve Mikrofon Yapılandırması
 
-Modern Termux yerleşik mikrofon iznine (`RECORD_AUDIO`) sahiptir. PulseAudio ve ALSA kullanarak hem terminal hem de X11 uygulamaları için çift yönlü (oynatma ve kayıt) ses altyapısı kurabilirsiniz.
+Modern Termux TV yerleşik mikrofon iznine (`RECORD_AUDIO`) sahiptir. PulseAudio ve ALSA kullanarak terminal uygulamaları için çift yönlü (oynatma ve kayıt) ses altyapısı kurabilirsiniz.
 
 ### 1. Mikrofon İznini Verin
 
@@ -131,7 +105,7 @@ pulseaudio --start \
 ```
 
 > [!TIP]
-> Bu komutu `~/.bashrc` dosyanıza veya X11 başlatma betiğinize ekleyerek her açılışta ses sunucusunun otomatik devreye girmesini sağlayabilirsiniz.
+> Bu komutu `~/.mkshrc` veya `~/.profile` dosyanıza ekleyerek her oturum açılışında ses sunucusunun otomatik devreye girmesini sağlayabilirsiniz.
 
 ### 4. Ses Çalma ve Kayıt Testi
 
@@ -154,54 +128,27 @@ pulseaudio --start \
 
 ---
 
-## Kullanıcı Arayüzü ve Çekmece Kısayolları
-
-Terminalin sol gezinme çekmecesi X11 ortamı için özel kontroller içerir:
-
-- **Çekmeceyi Açma:** Terminal ekranını sol kenardan sağa kaydırın veya çekmece çubuğuna dokunun.
-- **X11 Butonuna Dokunma (Tek Tık):** Neon Cyan `X_` butonuna tek dokunuş grafik X11 ekranını anında ön plana getirir.
-- **X11 Butonuna Uzun Basma (`onLongClick`):** `X_` butonuna basılı tuttuğunuzda doğrudan **X11 Tercihleri** (`LoriePreferences`) açılır. Buradan:
-  - Ekran çözünürlüğü, ölçekleme ve DPI ayarlarını,
-  - Dokunmatik modlarını (İzleme dörtgeni / Trackpad, Doğrudan Dokunma veya Sanal Fare),
-  - Yazılımsal ve Donanımsal işleme (Renderer) seçeneklerini,
-  - Sanal klavye ve ek tuş çubuğu davranışlarını yapılandırabilirsiniz.
-
----
-
 ## Dahili CLI Komutları
 
-Modern Termux, `$PREFIX/bin` içerisine otomatik olarak şu araçları yerleştirir:
-
-### `termux-x11`
-Gömülü motor ve yerel kütüphaneleri kullanarak X11 görüntü sunucusunu başlatır:
-```bash
-termux-x11 :0 [seçenekler]
-```
-
-### `termux-x11-preference`
-X11 ayarlarını doğrudan terminalden veya scriptler içerisinden okumanızı ve değiştirmenizi sağlar:
-```bash
-# Tüm ayarları ve mevcut değerleri listeleyin:
-termux-x11-preference list
-
-# Ayarları güncelleyin (örn. ölçekleme ve tam ekran):
-termux-x11-preference displayScale:100 fullscreen:true
-```
+Modern Termux TV, `$PREFIX/bin` içerisine otomatik olarak şu araçları yerleştirir:
 
 ### `termux-setup-microphone`
 Android sistemine yayın (broadcast) göndererek mikrofon izni isteme iletişim kutusunu tetikler (`android.permission.RECORD_AUDIO`).
 
 ### `termux-motd-refresh`
-**Modern Termux:MOTD** eklentisi kuruluysa anlık Pil, RAM, Depolama ve Çalışma Süresi bilgilerini içeren dinamik karşılama ekranını yeniler ve basar. Eklenti kurulu değilse kırmızı renkli açıklayıcı bir uyarı verir.
+**Modern Termux:MOTD** (`com.termux.motd`) eklentisi kuruluysa dinamik karşılama ekranını yeniler ve basar. Eklenti kurulu değilse kırmızı renkli açıklayıcı bir uyarı verir.
+
+### `mksh`
+Bootstrap içerisine gömülü MirBSD Korn Shell (`mksh_59c-5`) kabuğu; varsayılan olarak `~/.termux/shell` bağlantısı buna ayarlanır.
 
 ---
 
 ## Kurulum
 
-Modern Termux, **Android 7.0 veya daha yeni** bir sürüm ve **`arm64-v8a`** işlemci mimarisi gerektirir.
+Modern Termux TV, **Android 7.0 veya daha yeni (`minSdk 24`)** bir sürüm gerektirir ve hem **`arm64-v8a`** (64-bit) hem de **`armeabi-v7a`** (32-bit, Android TV cihazlarda yaygın) mimarileri için split APK sunar.
 
-1. [En Son Sürümler (Releases)](https://github.com/Furkan00487/modern-termux/releases/latest) sayfasını açın.
-2. `termux-app_<surum>-apt-android-7-github-release_arm64-v8a.apk` ve ilgili `..._sha256sums` dosyasını indirin.
+1. [En Son Sürümler (Releases)](https://github.com/Furkan00487/modern-termux-tv/releases/latest) sayfasını açın.
+2. Cihazınıza uygun APK dosyasını (emin değilseniz `adb shell getprop ro.product.cpu.abi`: `..._arm64-v8a.apk` veya `..._armeabi-v7a.apk`) ve ilgili `..._sha256sums` dosyasını indirin.
 3. [İndirmeyi doğrulayın](#indirilen-dosyayı-doğrulama) ve APK dosyasını kurun.
 
 ### Diğer Termux Sürümleriyle Uyumluluk
@@ -220,13 +167,13 @@ Geçiş yapmak için:
 Dosyaların bulunduğu dizinde SHA-256 sağlama toplamını kontrol edin:
 
 ```bash
-sha256sum -c termux-app_<surum>-apt-android-7-github-release_sha256sums
+sha256sum --ignore-missing -c termux-app_<surum>-apt-android-7-github-release_sha256sums
 ```
 
 APK imzasını `apksigner` ile kontrol edin:
 
 ```bash
-apksigner verify --verbose termux-app_<surum>-apt-android-7-github-release_arm64-v8a.apk
+apksigner verify --verbose termux-app_<surum>-apt-android-7-github-release_<abi>.apk
 ```
 
 Çıktıda hem **v2** hem de **v3** imza şemalarının geçerli (`true`) olduğu görülmelidir:
@@ -240,7 +187,7 @@ Verified using v3 scheme (APK Signature Scheme v3): true
 
 ## Sürüm Yükseltme ve Kaldırma
 
-- **Sürüm Yükseltme:** Yeni bir Modern Termux APK'sını eskisinin üzerine kurduğunuzda verileriniz ve kurulu paketleriniz korunur. `versionCode` arttığında uygulama otomatik olarak "Başlangıç paketleri güncelleniyor…" diyaloğunu açar, MOTD'yi ve dahili scriptleri yeniler.
+- **Sürüm Yükseltme:** Yeni bir Modern Termux TV APK'sını eskisinin üzerine kurduğunuzda verileriniz ve kurulu paketleriniz korunur. `versionCode` arttığında uygulama otomatik olarak "Başlangıç paketleri güncelleniyor…" diyaloğunu açar; `termux-setup-microphone`, `termux-motd-refresh`, Türkçe MOTD ve varsayılan `mksh` kabuğu kurulumunu günceller.
 - **Kaldırma:** Cihazınızda **Ayarlar** -> **Uygulamalar** -> **Modern Termux** yolunu izleyerek uygulamayı kaldırabilirsiniz.
 
 ---
@@ -248,32 +195,31 @@ Verified using v3 scheme (APK Signature Scheme v3): true
 ## Kaynaktan Derleme
 
 ```bash
-# Alt modüllerle birlikte depoyu klonlayın
-git clone --recursive https://github.com/Furkan00487/modern-termux.git
-cd modern-termux
+# Depoyu klonlayın
+git clone https://github.com/Furkan00487/modern-termux-tv.git
+cd modern-termux-tv
 
-# Birim testlerini çalıştırın
-./gradlew testDebugUnitTest
+# Tüm modüllerde birim testlerini çalıştırın
+./gradlew test
 
-# Sürüm APK'sını derleyin
+# Bootstrap paketleri + mksh ile sürüm APK'larını derleyin
 ./gradlew downloadBootstraps assembleRelease
 ```
 
-Yerel X11 bileşenleri alt modül (submodule) olarak bağlandığından depoyu `--recursive` parametresiyle klonlayın. CI üzerindeki sürüm imzalama adımı `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD` ve `KEYSTORE_ALIAS` secret'larını kullanır. Yerel derlemede bu anahtarlar bulunmadığında `assembleRelease` imzasız APK üretir; bu APK'yı cihazınıza yüklemeden önce kendi anahtarınızla imzalamanız gerekir.
+CI üzerindeki sürüm imzalama adımı `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD` ve `KEYSTORE_ALIAS` secret'larını kullanır. Yerel derlemede bu anahtarlar bulunmadığında `assembleRelease` imzasız APK üretir; bu APK'yı cihazınıza yüklemeden önce kendi anahtarınızla imzalamanız gerekir.
 
 ---
 
 ## Hata Ayıklama (Debugging)
 
-Modern Termux varsayılan olarak Türkçe arayüz kullanır. Sorun giderme günlüklerini toplamak için:
+Modern Termux TV, sistem diline göre Türkçe ve İngilizce arayüz desteği sunar. Sorun giderme günlüklerini toplamak için:
 
 1. **Ayarları Açın:**
-   - Ekranı sol kenardan kaydırıp dişli simgesine ⚙️ (**Ayarlar**) dokunun, ya da
-   - Terminal ekranına basılı tutup **Ayarlar** seçeneğini belirleyin.
+   - Kumandada uzun `OK` (veya `MENU`) ile Üst TV Kontrol Çubuğuna geçip **Ayarlar (`⚙`)** simgesini seçin, ya da
+   - **Oturumlar** çekmecesindeki dişli simgesine (`⚙`) dokunun.
 2. **Günlük Düzeyine Gidin:**
-   - **Modern Termux** başlığına dokunun.
-   - **Hata Ayıklama** seçeneğine dokunun.
-   - **Günlük Kaydı** altında bulunan **Günlük Düzeyi** seçeneğini açın.
+   - Sol kategori listesinden **Termux Hata Ayıklama** (**Termux Debugging**) seçeneğine geçin.
+   - **Günlük Düzeyi** (**Log Level**) ayarını açın.
 3. **Düzeyi Değiştirin:**
    - **Ayrıntılı (Verbose)** veya **Hata Ayıklama (Debug)** seçin.
    - İşlem bittikten sonra aşırı log yazımını ve pil tüketimini önlemek için yeniden **Normal** düzeyine getirin.
@@ -292,7 +238,7 @@ adb logcat -s "termux:*"
 
 ## Katkıda Bulunma
 
-- Değişikliklerinizi odaklı tutun ve PR açmadan önce `./gradlew testDebugUnitTest` komutunu çalıştırın.
+- Değişikliklerinizi odaklı tutun ve PR açmadan önce `./gradlew test` komutunu çalıştırın.
 - Commit mesajlarında [Conventional Commits](https://www.conventionalcommits.org) standardını kullanın (örn. `feat: dinamik bildirim ikonu eklendi`).
 - Yeni bir sürüm hazırlarken `app/build.gradle` ve alt modül gradle dosyalarındaki `versionCode` (+1 artış) ve `versionName` (SemVer `major.minor.patch`) değerlerini güncelleyin.
 - Modüler mimariyi korumak adına ortak yardımcı sınıfları `termux-shared` kütüphanesi içerisine yerleştirin.
