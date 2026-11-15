@@ -261,4 +261,17 @@
     <string name="termux_exit_kill_process_on">Uygulamadan çıkıldığında veya arka plana geçildiğinde Termux işlemi anında sonlandırılır. (Android TV varsayılanı)</string>
     <string name="termux_exit_kill_process_off">Uygulamadan çıkıldığında arka plan oturumları açık kalır.</string>
 
+    <!-- Compose for TV UI -->
+    <string name="tv_settings_about_summary">Paket, cihaz ve tanılama bilgileri</string>
+    <string name="tv_settings_open_report">Tam Tanılama Raporunu Aç</string>
+    <string name="tv_settings_about_description">Modern Termux TV; varsayılan mksh kabuğu, 32/64-bit ARM desteği ve bellek dostu çıkış yönetimiyle Android TV cihazlar için optimize edilmiştir.</string>
+    <string name="tv_settings_choose_value">Seçenek belirle</string>
+    <string name="tv_drawer_sessions_header">Terminal Oturumları</string>
+    <string name="tv_drawer_rename_action">Adlandır</string>
+    <string name="tv_drawer_kill_action">Kapat</string>
+    <string name="tv_drawer_named_session_action">Adlı / Güvenli</string>
+    <string name="tv_drawer_toolbar_action">Araç Çubuğu</string>
+    <string name="tv_drawer_session_running">Çalışan oturum</string>
+    <string name="tv_drawer_session_exited">Sonlandı (%1$d)</string>
+
 </resources>

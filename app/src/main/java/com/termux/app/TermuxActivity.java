@@ -23,8 +23,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.EditText;
-import android.widget.ImageButton;
-import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
@@ -33,6 +31,8 @@ import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
+import com.termux.app.tv.LowRamWarningHost;
+import com.termux.app.tv.TvDrawerBridge;
 import com.termux.shared.activities.ReportActivity;
 import com.termux.shared.activity.ActivityUtils;
 import com.termux.shared.activity.media.AppCompatActivityUtils;
@@ -45,7 +45,7 @@ import com.termux.app.activities.HelpActivity;
 import com.termux.app.activities.SettingsActivity;
 import com.termux.shared.termux.crash.TermuxCrashUtils;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
-import com.termux.app.terminal.TermuxSessionsListViewController;
+import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.app.terminal.io.TerminalToolbarViewPager;
 import com.termux.app.terminal.TermuxTerminalViewClient;
 import com.termux.shared.termux.extrakeys.ExtraKeysView;
@@ -64,10 +64,13 @@ import com.termux.view.TerminalViewClient;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager.widget.ViewPager;
 
 import java.util.Arrays;
+
+import kotlin.Unit;
 
 /**
  * A terminal emulator activity.
@@ -136,9 +139,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     TermuxTerminalExtraKeys mTermuxTerminalExtraKeys;
 
     /**
-     * The termux sessions list controller.
+     * Compose for TV session drawer bridge and host view.
      */
-    TermuxSessionsListViewController mTermuxSessionListViewController;
+    private TvDrawerBridge mTvDrawerBridge;
+    private ComposeView mTvDrawerComposeView;
+    private ComposeView mLowRamComposeView;
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -249,11 +254,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setTerminalToolbarView(savedInstanceState);
 
-        setSettingsButtonView();
-
-        setNewSessionButtonView();
-
-        setToggleKeyboardView();
+        initTvDrawerCompose();
 
         registerForContextMenu(mTerminalView);
 
@@ -504,11 +505,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setTermuxSessionsListView() {
-        ListView termuxSessionsListView = findViewById(R.id.terminal_sessions_list);
-        mTermuxSessionListViewController = new TermuxSessionsListViewController(this, mTermuxService.getTermuxSessions());
-        termuxSessionsListView.setAdapter(mTermuxSessionListViewController);
-        termuxSessionsListView.setOnItemClickListener(mTermuxSessionListViewController);
-        termuxSessionsListView.setOnItemLongClickListener(mTermuxSessionListViewController);
+        termuxSessionListNotifyUpdated();
     }
 
 
@@ -569,34 +566,100 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
 
 
-    private void setSettingsButtonView() {
-        ImageButton settingsButton = findViewById(R.id.settings_button);
-        settingsButton.setOnClickListener(v -> {
-            ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
-        });
-    }
+    private void initTvDrawerCompose() {
+        mLowRamComposeView = findViewById(R.id.tv_low_ram_compose_view);
+        mTvDrawerComposeView = findViewById(R.id.tv_drawer_compose_view);
 
-    private void setNewSessionButtonView() {
-        View newSessionButton = findViewById(R.id.new_session_button);
-        newSessionButton.setOnClickListener(v -> mTermuxTerminalSessionActivityClient.addNewSession(false, null));
-        newSessionButton.setOnLongClickListener(v -> {
-            TextInputDialogUtils.textInput(TermuxActivity.this, R.string.title_create_named_session, null,
-                R.string.action_create_named_session_confirm, text -> mTermuxTerminalSessionActivityClient.addNewSession(false, text),
-                R.string.action_new_session_failsafe, text -> mTermuxTerminalSessionActivityClient.addNewSession(true, text),
-                -1, null, null);
-            return true;
-        });
-    }
+        mTvDrawerBridge = new TvDrawerBridge(
+            index -> {
+                if (mTermuxService != null && mTermuxTerminalSessionActivityClient != null) {
+                    TermuxSession session = mTermuxService.getTermuxSession(index);
+                    if (session != null) {
+                        mTermuxTerminalSessionActivityClient.setCurrentSession(session.getTerminalSession());
+                    }
+                }
+                getDrawer().closeDrawers();
+                return Unit.INSTANCE;
+            },
+            index -> {
+                if (mTermuxService != null && mTermuxTerminalSessionActivityClient != null) {
+                    TermuxSession session = mTermuxService.getTermuxSession(index);
+                    if (session != null) {
+                        mTermuxTerminalSessionActivityClient.renameSession(session.getTerminalSession());
+                    }
+                }
+                return Unit.INSTANCE;
+            },
+            index -> {
+                if (mTermuxService != null && mTermuxTerminalSessionActivityClient != null) {
+                    TermuxSession termuxSession = mTermuxService.getTermuxSession(index);
+                    if (termuxSession != null) {
+                        TerminalSession session = termuxSession.getTerminalSession();
+                        if (session.isRunning()) {
+                            session.finishIfRunning();
+                        } else {
+                            mTermuxTerminalSessionActivityClient.removeFinishedSession(session);
+                        }
+                    }
+                }
+                return Unit.INSTANCE;
+            },
+            () -> {
+                if (mTermuxTerminalSessionActivityClient != null) {
+                    mTermuxTerminalSessionActivityClient.addNewSession(false, null);
+                }
+                return Unit.INSTANCE;
+            },
+            () -> {
+                TextInputDialogUtils.textInput(TermuxActivity.this, R.string.title_create_named_session, null,
+                    R.string.action_create_named_session_confirm, text -> mTermuxTerminalSessionActivityClient.addNewSession(false, text),
+                    R.string.action_new_session_failsafe, text -> mTermuxTerminalSessionActivityClient.addNewSession(true, text),
+                    -1, null, null);
+                return Unit.INSTANCE;
+            },
+            () -> {
+                if (mTermuxTerminalViewClient != null) {
+                    mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
+                }
+                getDrawer().closeDrawers();
+                return Unit.INSTANCE;
+            },
+            () -> {
+                toggleTerminalToolbar();
+                return Unit.INSTANCE;
+            },
+            () -> {
+                ActivityUtils.startActivity(this, new Intent(this, SettingsActivity.class));
+                return Unit.INSTANCE;
+            },
+            () -> {
+                getDrawer().closeDrawers();
+                return Unit.INSTANCE;
+            }
+        );
 
-    private void setToggleKeyboardView() {
-        findViewById(R.id.toggle_keyboard_button).setOnClickListener(v -> {
-            mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
-            getDrawer().closeDrawers();
-        });
+        if (mTvDrawerComposeView != null) {
+            mTvDrawerBridge.bind(mTvDrawerComposeView);
+        }
 
-        findViewById(R.id.toggle_keyboard_button).setOnLongClickListener(v -> {
-            toggleTerminalToolbar();
-            return true;
+        getDrawer().addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(@NonNull View drawerView) {
+                termuxSessionListNotifyUpdated();
+                if (mTvDrawerBridge != null) {
+                    mTvDrawerBridge.notifyDrawerOpened();
+                }
+                if (mTvDrawerComposeView != null) {
+                    mTvDrawerComposeView.requestFocus();
+                }
+            }
+
+            @Override
+            public void onDrawerClosed(@NonNull View drawerView) {
+                if (mTerminalView != null) {
+                    mTerminalView.requestFocus();
+                }
+            }
         });
     }
 
@@ -607,7 +670,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     @SuppressLint("RtlHardcoded")
     @Override
     public void onBackPressed() {
-        if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
+        if (mLowRamComposeView != null && mLowRamComposeView.getVisibility() == View.VISIBLE) {
+            LowRamWarningHost.hide(mLowRamComposeView);
+            if (mTerminalView != null) mTerminalView.requestFocus();
+        } else if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
             getDrawer().closeDrawers();
         } else if (shouldAutoKillProcessOnExit(ExitKillPolicy.ExitReason.BACK_PRESSED)) {
             TermuxApplication.terminateTermuxProcessNow(this, this);
@@ -638,19 +704,22 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         String formattedMem = LowRamPolicy.formatMemorySize(totalMemBytes);
-        try {
-            new AlertDialog.Builder(this)
-                .setTitle(R.string.title_low_ram_warning)
-                .setMessage(getString(R.string.msg_low_ram_warning, formattedMem))
-                .setPositiveButton(R.string.action_ok, null)
-                .setNeutralButton(R.string.action_dont_show_again, (dialog, which) -> {
+        if (mLowRamComposeView != null) {
+            LowRamWarningHost.show(
+                mLowRamComposeView,
+                formattedMem,
+                () -> {
+                    if (mTerminalView != null) mTerminalView.requestFocus();
+                    return Unit.INSTANCE;
+                },
+                () -> {
                     if (mPreferences != null) {
                         mPreferences.setLowRamWarningDismissed(true);
                     }
-                })
-                .show();
-        } catch (WindowManager.BadTokenException ignored) {
-            // Activity already dismissed - ignore.
+                    if (mTerminalView != null) mTerminalView.requestFocus();
+                    return Unit.INSTANCE;
+                }
+            );
         }
     }
 
@@ -916,7 +985,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
 
     public void termuxSessionListNotifyUpdated() {
-        mTermuxSessionListViewController.notifyDataSetChanged();
+        if (mTvDrawerBridge != null) {
+            mTvDrawerBridge.refresh(mTermuxService, getCurrentSession());
+        }
+    }
+
+    public void scrollToDrawerSession(int index) {
+        if (mTvDrawerBridge != null) {
+            mTvDrawerBridge.scrollToSession(index);
+        }
     }
 
     public boolean isVisible() {

@@ -271,4 +271,17 @@
     <string name="termux_exit_kill_process_on">All terminal processes will be terminated immediately when exiting or moving to background. (Default on Android TV)</string>
     <string name="termux_exit_kill_process_off">Background sessions will remain alive after leaving the app.</string>
 
+    <!-- Compose for TV UI -->
+    <string name="tv_settings_about_summary">Package, device, and diagnostic info</string>
+    <string name="tv_settings_open_report">Open Full Diagnostic Report</string>
+    <string name="tv_settings_about_description">Modern Termux TV is optimized for Android TV devices with mksh default shell, split ARM/ARM64 support, and memory-safe background termination.</string>
+    <string name="tv_settings_choose_value">Choose option</string>
+    <string name="tv_drawer_sessions_header">Terminal Sessions</string>
+    <string name="tv_drawer_rename_action">Rename</string>
+    <string name="tv_drawer_kill_action">Close</string>
+    <string name="tv_drawer_named_session_action">Named / Failsafe</string>
+    <string name="tv_drawer_toolbar_action">Toolbar</string>
+    <string name="tv_drawer_session_running">Active session</string>
+    <string name="tv_drawer_session_exited">Exited (%1$d)</string>
+
 </resources>

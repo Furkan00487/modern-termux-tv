@@ -4,7 +4,9 @@ buildscript {
         google()
     }
     dependencies {
-        classpath "com.android.tools.build:gradle:8.13.2"
+        classpath "com.android.tools.build:gradle:9.5.1"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21"
+        classpath "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:2.4.21"
         classpath "org.bouncycastle:bcprov-jdk18on:1.87"
         classpath "org.bouncycastle:bcpkix-jdk18on:1.87"
         classpath "io.netty:netty-codec-http2:4.2.20.Final"
