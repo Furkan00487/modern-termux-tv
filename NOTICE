@@ -1,0 +1,51 @@
+# NOTICE
+
+Copyright (c) 2026 Furkan00487 (original contributions and modifications)
+Upstream Termux Project: https://github.com/termux/termux-app
+
+## License
+This repository is licensed under the GNU General Public License v3.0 only
+(`GPL-3.0-only`; see the root `LICENSE` file), subject to the per-module
+licenses and exceptions noted below and in `termux-shared/LICENSE.md`:
+
+- `terminal-emulator` and `terminal-view`: derived from Terminal Emulator for
+  Android (Apache License 2.0).
+- `termux-shared`: MIT License with GPL-3.0-only, GPL-2.0-only with Classpath
+  exception, and Apache-2.0 components as detailed in `termux-shared/LICENSE.md`.
+
+## Modification Notice (GPLv3 §5(a))
+**Modern Termux TV** (`Furkan00487/modern-termux-tv`) is an Android TV–focused
+modified fork of [termux/termux-app](https://github.com/termux/termux-app) and
+`Furkan00487/modern-termux`.
+
+Because the repository history starts on **2026-10-20** without importing the
+full upstream git commit history, this `NOTICE` documents the upstream origin
+and modifications:
+
+- **Upstream base:** `termux/termux-app` (`v0.118.0`, `versionCode 118`),
+  forked and modified starting **2026-10-20**.
+- **Summary of modifications (`2026-10-20` – `2026-11-16`):**
+  - `2026-10-20` – `2026-11-07`: compileSdk/targetSdk 36 updates, custom theme,
+    `RECORD_AUDIO` / `termux-setup-microphone`, custom MOTD, Turkish
+    localization, and multi-line paste confirmation (`v0.123.0`).
+  - `2026-11-15`: Android TV rework (`v0.124.1`) — removed built-in `x11/`
+    module, added `arm64-v8a` / `armeabi-v7a` APK splits, bundled `mksh` as
+    default shell, added `< 2 GiB` low-RAM guard and safe TV exit cleanup,
+    and migrated the TV interface to Jetpack Compose for TV with D-pad remote
+    navigation.
+
+## Corresponding Source for Bundled Packages (GPLv3 §6)
+Release APKs built from this repository embed Termux bootstrap archives
+sourced from the upstream `termux/termux-packages` project:
+
+- `apt-android-7` variant: `bootstrap-2026.02.12-r1+apt.android-7`
+  (`bootstrap-aarch64.zip`, `bootstrap-arm.zip`)
+- `apt-android-5` variant (when selected): `bootstrap-2022.04.28-r6+apt-android-5`
+- Bundled `mksh` shell (`mksh_59c-5`, MirOS License): binary fetched from Termux
+  APT repository; build recipe/source reference in `termux/termux-packages`
+  (`packages/mksh`).
+
+The Corresponding Source for all GPL-licensed (and other free-software)
+packages distributed inside these bootstrap archives is available at:
+https://github.com/termux/termux-packages (for the corresponding bootstrap
+release/package versions used at build time).

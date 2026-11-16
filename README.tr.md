@@ -3,7 +3,7 @@
 [![Sürüm](https://img.shields.io/github/v/release/Furkan00487/modern-termux-tv?label=s%C3%BCr%C3%BCm&color=00E5FF)](https://github.com/Furkan00487/modern-termux-tv/releases/latest)
 [![Release Derleme](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/release_build.yml/badge.svg)](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/release_build.yml)
 [![Birim Testleri](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/run_tests.yml/badge.svg)](https://github.com/Furkan00487/modern-termux-tv/actions/workflows/run_tests.yml)
-[![Lisans: GPL v3](https://img.shields.io/badge/lisans-GPL--3.0-blue.svg)](LICENSE)
+[![Lisans: GPL-3.0-only](https://img.shields.io/badge/lisans-GPL--3.0--only-blue.svg)](LICENSE)
 
 🌐 **[English](README.md)** | **[Türkçe](README.tr.md)**
 
@@ -256,6 +256,10 @@ adb logcat -s "termux:*"
 
 ## Lisans
 
-Modern Termux, [GNU General Public License v3.0](LICENSE) altında lisanslanmıştır.
+Telif Hakkı (c) 2026 Furkan00487 (değişiklikler ve özgün katkılar). Üst kaynak kodların telif hakkı [Termux](https://github.com/termux/termux-app) katkıcılarına aittir.
+
+Modern Termux TV, [GNU General Public License v3.0 only (`GPL-3.0-only`)](LICENSE) altında lisanslanmıştır.
+- Değişiklik bildirimleri, üst depo kaynağı ve Karşılık Gelen Kaynak (Corresponding Source — GPLv3 §5(a) & §6) detayları [`NOTICE`](NOTICE) dosyasında yer alır.
+- Release APK'larının içerdiği Termux bootstrap arşivlerindeki (ve `mksh` tarifi için) GPL lisanslı paketlerin karşılık gelen kaynak kodları, derlemede kullanılan bootstrap sürümü için [termux/termux-packages](https://github.com/termux/termux-packages) deposundan temin edilebilir (detaylar: [`NOTICE`](NOTICE)).
 - [Terminal Emulator for Android](https://github.com/jackpal/Android-Terminal-Emulator) projesinden alınan terminal emülasyon kodları Apache 2.0 lisansına tabidir (`terminal-view` ve `terminal-emulator`).
 - Diğer lisans detayları için `termux-shared/LICENSE.md` dosyasını inceleyebilirsiniz.
