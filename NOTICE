@@ -33,6 +33,16 @@ and modifications:
     default shell, added `< 2 GiB` low-RAM guard and safe TV exit cleanup,
     and migrated the TV interface to Jetpack Compose for TV with D-pad remote
     navigation.
+  - `2026-11-20`: Upstream `termux/termux-app` sync (`v0.125.0`, synced
+    through `8629e63`) — ported `64KB` session read buffer, `KeyHandler`
+    `kP`/`kN` fix, `NotificationUtils` null `BigTextStyle` guard,
+    `RunCommandService` `allow-external-apps` ordering fix,
+    `TermuxOpenReceiver` null URI segment fix, scroll position preservation,
+    `TerminalBuffer`/`TerminalRow`/`TerminalRenderer`/`termux.c` fixes,
+    `100KB` OSC 52 clipboard limit, multi-window flicker fix, Sixel (`DCS q`)
+    and iTerm2 (`OSC 1337`) inline bitmap support with `< 2 GiB` low-RAM
+    image allocation/cache limits, and `APPLICATION_PREFERENCES` settings
+    routing.
 
 ## Corresponding Source for Bundled Packages (GPLv3 §6)
 Release APKs built from this repository embed Termux bootstrap archives
