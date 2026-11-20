@@ -5,6 +5,8 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 
+import com.termux.terminal.TerminalBitmap;
+
 import java.util.Locale;
 
 /**
@@ -16,6 +18,10 @@ public final class LowRamPolicy {
     public static final long ONE_MIB_BYTES = 1024L * 1024L;
     public static final long ONE_GIB_BYTES = 1024L * ONE_MIB_BYTES;
     public static final long TWO_GIB_BYTES = 2L * ONE_GIB_BYTES;
+
+    public static final int LOW_RAM_MAX_BITMAP_BYTES = 8 * 1024 * 1024;
+    public static final int LOW_RAM_MAX_TOTAL_BITMAP_BYTES = 16 * 1024 * 1024;
+    public static final int LOW_RAM_MAX_BITMAP_DIMENSION_PX = 2048;
 
     private LowRamPolicy() {
     }
@@ -48,5 +54,24 @@ public final class LowRamPolicy {
         ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
         activityManager.getMemoryInfo(memoryInfo);
         return memoryInfo.totalMem;
+    }
+
+    /**
+     * Configures {@link TerminalBitmap} memory and dimension limits for low-RAM (&lt; 2 GiB) devices
+     * so oversized Sixel / OSC 1337 image payloads are rejected cleanly without OOM.
+     */
+    public static void applyTerminalImagePolicy(long totalMemBytes) {
+        if (isLowRam(totalMemBytes)) {
+            TerminalBitmap.setLowRamImageLimits(
+                LOW_RAM_MAX_BITMAP_BYTES,
+                LOW_RAM_MAX_TOTAL_BITMAP_BYTES,
+                LOW_RAM_MAX_BITMAP_DIMENSION_PX);
+        } else {
+            TerminalBitmap.resetImageLimits();
+        }
+    }
+
+    public static void applyTerminalImagePolicy(@NonNull Context context) {
+        applyTerminalImagePolicy(getTotalDeviceMemoryBytes(context));
     }
 }

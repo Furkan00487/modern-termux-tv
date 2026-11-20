@@ -2723,7 +2723,7 @@ public final class TerminalEmulator {
                     // > Older versions of tmux have a limit of 256 bytes for the entire sequence.
                     // - https://iterm2.com/documentation-images.html
                     terminalControlArgsCapacity = 256;
-                    terminalControlArgsMaxLength = TerminalBitmap.MAX_BITMAP_SIZE +
+                    terminalControlArgsMaxLength = TerminalBitmap.getEffectiveMaxBitmapSize() +
                         /* `1337;File=inline=1;size=209715200;name=xxxxxxxxxxxxxxxxxxxxxxxx;width=8192px;height=8192px;preserveAspectRatio=1:` */ 150;
                     break;
             }

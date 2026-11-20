@@ -295,6 +295,12 @@ public class ITermImage {
                 if (colonIndex >= 0 && colonIndex + 1 < oscArgs.length()) {
                     setState(ImageState.IMAGE_READING);
                     int imageStartIndex = colonIndex + 1;
+                    int imageLen = oscArgs.length() - imageStartIndex;
+                    int maxEncodedSize = TerminalBitmap.getEffectiveMaxBitmapSize();
+                    if (mEncodedImage.length() + imageLen > maxEncodedSize) {
+                        setStateFailed("Singlepart image size exceeds max limit of " + maxEncodedSize + " bytes");
+                        return false;
+                    }
 
                     try {
                         // Appending can cause an increase in capacity and cause an OOM.
@@ -322,6 +328,12 @@ public class ITermImage {
             setState(ImageState.IMAGE_READING);
 
             if (index < oscArgs.length()) {
+                int partLen = oscArgs.length() - index;
+                int maxEncodedSize = TerminalBitmap.getEffectiveMaxBitmapSize();
+                if (mEncodedImage.length() + partLen > maxEncodedSize) {
+                    setStateFailed("Multipart image size exceeds max limit of " + maxEncodedSize + " bytes");
+                    return false;
+                }
                 try {
                     // Appending can cause an increase in capacity and cause an OOM.
                     mEncodedImage.append(oscArgs.substring(index));

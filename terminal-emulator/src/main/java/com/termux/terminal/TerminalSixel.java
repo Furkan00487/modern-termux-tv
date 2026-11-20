@@ -79,6 +79,12 @@ public class TerminalSixel {
 
 
     public static TerminalSixel build(TerminalSessionClient client, int bitmapWidth, int bitmapHeight) {
+        if (!TerminalBitmap.isBitmapSizeAllowed(bitmapWidth, bitmapHeight)) {
+            Logger.logError(client, LOG_TAG, "Create sixel bitmap for" +
+                " width " + bitmapWidth + " with height " + bitmapHeight + " exceeds max bitmap limits");
+            return null;
+        }
+
         try {
 
             Bitmap bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);

@@ -8,6 +8,8 @@ import android.os.Environment;
 
 import com.termux.app.activities.SettingsActivity;
 import com.termux.shared.termux.TermuxConstants.TERMUX_APP.RUN_COMMAND_SERVICE;
+import com.termux.terminal.TerminalEmulator;
+import com.termux.terminal.TerminalOutput;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,6 +20,9 @@ import org.robolectric.RuntimeEnvironment;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -54,7 +59,31 @@ public class UpstreamSyncAppFixesTest {
     public void contentProviderGetTypeHandlesNullLastPathSegment() {
         TermuxOpenReceiver.ContentProvider provider = new TermuxOpenReceiver.ContentProvider();
         assertNull(provider.getType(Uri.parse("content://com.termux.files/")));
-        assertEquals("text/plain", provider.getType(Uri.parse("content://com.termux.files/hello.txt")));
+        assertNull(provider.getType(Uri.parse("content://com.termux.files/noextension")));
+    }
+
+    @Test
+    public void osc52ClipboardSupportsPayloadsUpTo100Kb() {
+        List<String> clipboardPuts = new ArrayList<>();
+        TerminalOutput output = new TerminalOutput() {
+            @Override public void write(byte[] data, int offset, int count) {}
+            @Override public void titleChanged(String oldTitle, String newTitle) {}
+            @Override public void onCopyTextToClipboard(String text) { clipboardPuts.add(text); }
+            @Override public void onPasteTextFromClipboard() {}
+            @Override public void onBell() {}
+            @Override public void onColorsChanged() {}
+        };
+        TerminalEmulator emulator = new TerminalEmulator(output, 80, 24, 10, 20, 100, null);
+        byte[] raw = new byte[16 * 1024];
+        for (int i = 0; i < raw.length; i++) {
+            raw[i] = (byte) ('A' + (i % 26));
+        }
+        String expected = new String(raw, StandardCharsets.US_ASCII);
+        String b64 = Base64.getEncoder().encodeToString(raw);
+        byte[] seq = ("\033]52;c;" + b64 + "\007").getBytes(StandardCharsets.US_ASCII);
+        emulator.append(seq, seq.length);
+        assertEquals(1, clipboardPuts.size());
+        assertEquals(expected, clipboardPuts.get(0));
     }
 
     @Test

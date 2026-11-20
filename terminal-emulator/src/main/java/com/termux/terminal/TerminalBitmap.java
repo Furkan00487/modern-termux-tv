@@ -125,6 +125,52 @@ public class TerminalBitmap {
         }
     }
 
+    private static volatile int sMaxBitmapSizeOverride = 0;
+    private static volatile int sMaxTotalBitmapsSize = 0;
+    private static volatile int sMaxBitmapDimension = 0;
+
+    /**
+     * Configure low-RAM image limits for terminal bitmaps (Sixel and iTerm2).
+     * Non-positive values leave the corresponding limit disabled.
+     */
+    public static void setLowRamImageLimits(int maxBitmapBytes, int maxTotalBitmapsBytes, int maxDimensionPx) {
+        sMaxBitmapSizeOverride = Math.max(0, maxBitmapBytes);
+        sMaxTotalBitmapsSize = Math.max(0, maxTotalBitmapsBytes);
+        sMaxBitmapDimension = Math.max(0, maxDimensionPx);
+    }
+
+    /** Reset low-RAM image limits back to default upstream bounds. */
+    public static void resetImageLimits() {
+        sMaxBitmapSizeOverride = 0;
+        sMaxTotalBitmapsSize = 0;
+        sMaxBitmapDimension = 0;
+    }
+
+    public static int getEffectiveMaxBitmapSize() {
+        int override = sMaxBitmapSizeOverride;
+        return override > 0 ? Math.min(MAX_BITMAP_SIZE, override) : MAX_BITMAP_SIZE;
+    }
+
+    public static int getEffectiveMaxTotalBitmapsSize() {
+        return sMaxTotalBitmapsSize;
+    }
+
+    public static int getEffectiveMaxBitmapDimension() {
+        return sMaxBitmapDimension;
+    }
+
+    public static boolean isBitmapSizeAllowed(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        int maxDimension = sMaxBitmapDimension;
+        if (maxDimension > 0 && (width > maxDimension || height > maxDimension)) {
+            return false;
+        }
+        long byteSize = (long) width * (long) height * 4L;
+        return byteSize > 0 && byteSize <= getEffectiveMaxBitmapSize();
+    }
+
 
 
     protected final TerminalSessionClient mClient;
@@ -200,6 +246,13 @@ public class TerminalBitmap {
                 return null;
             }
 
+            if (image.length > getEffectiveMaxBitmapSize()) {
+                Logger.logError(terminalBuffer.getClient(), LOG_TAG,
+                    "Create terminal bitmap " + bitmapNum + " from image byte array failed:" +
+                        " Image byte length " + image.length + " exceeds max bitmap size " + getEffectiveMaxBitmapSize());
+                return null;
+            }
+
             if (height > 0 || width > 0) {
                 // Get image dimensions without creating a bitmap.
                 BitmapFactory.Options options = new BitmapFactory.Options();
@@ -216,6 +269,11 @@ public class TerminalBitmap {
 
                 imageHeight = options.outHeight;
                 imageWidth = options.outWidth;
+                if (imageWidth <= 0 || imageHeight <= 0) {
+                    Logger.logError(terminalBuffer.getClient(), LOG_TAG,
+                        "Create terminal bitmap " + bitmapNum + " from image byte array failed: Invalid image bounds");
+                    return null;
+                }
                 if (shouldPreserveAspectRatio) {
                     double wFactor = 9999.0;
                     double hFactor = 9999.0;
@@ -235,6 +293,13 @@ public class TerminalBitmap {
                     if (width <= 0) {
                         newWidth = imageWidth;
                     }
+                }
+
+                if (!isBitmapSizeAllowed(newWidth, newHeight)) {
+                    Logger.logError(terminalBuffer.getClient(), LOG_TAG,
+                        "Create terminal bitmap " + bitmapNum + " from image byte array failed:" +
+                            " Requested dimensions " + newWidth + "x" + newHeight + " exceed max limits");
+                    return null;
                 }
 
                 int scaleFactor = 1;
@@ -297,6 +362,22 @@ public class TerminalBitmap {
                     return null;
                 }
             } else {
+                BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+                boundsOptions.inJustDecodeBounds = true;
+                try {
+                    BitmapFactory.decodeByteArray(image, 0, image.length, boundsOptions);
+                } catch (Throwable t) {
+                    if (t instanceof OutOfMemoryError) System.gc();
+                }
+                if (boundsOptions.outWidth > 0 && boundsOptions.outHeight > 0 &&
+                        !isBitmapSizeAllowed(boundsOptions.outWidth, boundsOptions.outHeight)) {
+                    Logger.logError(terminalBuffer.getClient(), LOG_TAG,
+                        "Create terminal bitmap " + bitmapNum + " from image byte array failed:" +
+                            " Image dimensions " + boundsOptions.outWidth + "x" + boundsOptions.outHeight +
+                            " exceed max limits");
+                    return null;
+                }
+
                 // Create bitmap from image.
                 try {
                     newBitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
@@ -360,6 +441,10 @@ public class TerminalBitmap {
 
         int bitmapWidth = bitmap.getWidth();
         int bitmapHeight = bitmap.getHeight();
+        if (!isBitmapSizeAllowed(bitmapWidth, bitmapHeight)) {
+            throw new IllegalArgumentException("Bitmap dimensions " + bitmapWidth + "x" + bitmapHeight +
+                " exceed max limits");
+        }
         int width = Math.min(terminalBuffer.mColumns - x, (bitmapWidth + cellWidth - 1) / cellWidth);
         int height = (bitmapHeight + cellHeight - 1) / cellHeight;
         int s = 0;
@@ -399,6 +484,14 @@ public class TerminalBitmap {
         return mBitmap;
     }
 
+    public long getBitmapByteSize() {
+        if (mBitmap == null) {
+            return 0L;
+        }
+        long pixelBytes = (long) mBitmap.getWidth() * (long) mBitmap.getHeight() * 4L;
+        return Math.max(pixelBytes, mBitmap.getAllocationByteCount());
+    }
+
 
     public int getCellWidth() {
         return mCellWidth;
@@ -431,11 +524,11 @@ public class TerminalBitmap {
         
         Bitmap newBitmap;
         try {
-            int newBitmapSize = bitmapWidth * bitmapHeight * 4;
-            if (newBitmapSize < 0 || newBitmapSize > MAX_BITMAP_SIZE) {
+            if (!isBitmapSizeAllowed(bitmapWidth, bitmapHeight)) {
                 Logger.logError(client, logTag, "The new " + label + " bitmap after resize with" +
                     " width " + bitmapWidth + " and height " + bitmapHeight +
-                    " has size " + newBitmapSize + " greater than max bitmap size " + MAX_BITMAP_SIZE);
+                    " exceeds max bitmap limits (maxSize=" + getEffectiveMaxBitmapSize() +
+                    ", maxDim=" + getEffectiveMaxBitmapDimension() + ")");
                 return null;
             }
 

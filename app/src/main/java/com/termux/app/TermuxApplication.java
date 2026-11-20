@@ -96,6 +96,9 @@ public class TermuxApplication extends Application {
         // Set NightMode.APP_NIGHT_MODE
         TermuxThemeUtils.setAppNightMode(properties.getNightMode());
 
+        // Cap terminal Sixel / OSC 1337 bitmap allocations on < 2 GiB RAM TV devices
+        LowRamPolicy.applyTerminalImagePolicy(context);
+
         // Check and create termux files directory. If failed to access it like in case of secondary
         // user or external sd card installation, then don't run files directory related code
         Error error = TermuxFileUtils.isTermuxFilesDirectoryAccessible(this, true, true);

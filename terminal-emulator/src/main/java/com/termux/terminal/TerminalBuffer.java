@@ -2,8 +2,9 @@ package com.termux.terminal;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Set;
-import java.util.HashMap;
 
 import android.graphics.Bitmap;
 import android.graphics.Rect;
@@ -43,7 +44,7 @@ public final class TerminalBuffer {
 
 
     /** The map for bitmap number to the {@link TerminalBitmap} loaded in the terminal. */
-    private final HashMap<Integer, TerminalBitmap> mTerminalBitmaps;
+    private final LinkedHashMap<Integer, TerminalBitmap> mTerminalBitmaps;
 
     /** The time since last garbage collection for all the {@link TerminalBitmap} that are loaded in the terminal. */
     private long mTerminalBitmapsLastGC;
@@ -91,7 +92,7 @@ public final class TerminalBuffer {
         mLines = new TerminalRow[totalRows];
 
         blockSet(0, 0, columns, screenRows, ' ', TextStyle.NORMAL);
-        mTerminalBitmaps = new HashMap<>();
+        mTerminalBitmaps = new LinkedHashMap<>();
         mTerminalBitmapsLastGC = SystemClock.uptimeMillis();
     }
 
@@ -579,6 +580,46 @@ public final class TerminalBuffer {
         mTerminalBitmaps.clear();
     }
 
+    public synchronized int getTerminalBitmapCount() {
+        return mTerminalBitmaps.size();
+    }
+
+    public synchronized long getTotalTerminalBitmapBytes() {
+        long total = 0L;
+        for (TerminalBitmap bitmap : mTerminalBitmaps.values()) {
+            if (bitmap != null) {
+                total += bitmap.getBitmapByteSize();
+            }
+        }
+        return total;
+    }
+
+    private synchronized boolean registerTerminalBitmap(int bitmapNum, TerminalBitmap terminalBitmap) {
+        if (terminalBitmap == null || terminalBitmap.getBitmap() == null) {
+            return false;
+        }
+        int maxTotalBytes = TerminalBitmap.getEffectiveMaxTotalBitmapsSize();
+        long incomingBytes = terminalBitmap.getBitmapByteSize();
+        if (maxTotalBytes > 0) {
+            if (incomingBytes > maxTotalBytes) {
+                Logger.logError(mClient, LOG_TAG, "Terminal bitmap " + bitmapNum + " size " + incomingBytes +
+                    " exceeds max total bitmaps budget " + maxTotalBytes);
+                return false;
+            }
+            if (getTotalTerminalBitmapBytes() + incomingBytes > maxTotalBytes) {
+                doTerminalBitmapsGC(0);
+            }
+            Iterator<Integer> it = mTerminalBitmaps.keySet().iterator();
+            while (it.hasNext() && getTotalTerminalBitmapBytes() + incomingBytes > maxTotalBytes) {
+                it.next();
+                it.remove();
+            }
+        }
+        mTerminalBitmaps.put(bitmapNum, terminalBitmap);
+        doTerminalBitmapsGC(30000);
+        return true;
+    }
+
     public synchronized Bitmap getSixelBitmap(long style) {
         TerminalBitmap terminalBitmap = getTerminalBitmap(style);
         return terminalBitmap != null ? terminalBitmap.mBitmap : null;
@@ -616,12 +657,9 @@ public final class TerminalBuffer {
 
         TerminalBitmap terminalBitmap = TerminalBitmap.build(this, bitmapNum, mTerminalSixel, x, y, cellW, cellH);
         mTerminalSixel = null;
-        if (terminalBitmap == null || terminalBitmap.getBitmap() == null) {
+        if (!registerTerminalBitmap(bitmapNum, terminalBitmap)) {
             return 0;
         }
-        mTerminalBitmaps.put(bitmapNum, terminalBitmap);
-
-        doTerminalBitmapsGC(30000);
         return terminalBitmap.mScrollLines;
     }
 
@@ -697,12 +735,9 @@ public final class TerminalBuffer {
 
         TerminalBitmap terminalBitmap = TerminalBitmap.build(this, bitmapNum, image, x, y,
             cellW, cellH, width, height, shouldPreserveAspectRatio);
-        if (terminalBitmap == null || terminalBitmap.getBitmap() == null) {
+        if (!registerTerminalBitmap(bitmapNum, terminalBitmap)) {
             return new int[] {0, 0};
         }
-        mTerminalBitmaps.put(bitmapNum, terminalBitmap);
-
-        doTerminalBitmapsGC(30000);
         return terminalBitmap.mCursorDelta;
     }
 

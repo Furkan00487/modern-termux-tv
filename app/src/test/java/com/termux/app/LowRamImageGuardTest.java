@@ -16,11 +16,9 @@ import org.robolectric.RobolectricTestRunner;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -137,11 +135,15 @@ public class LowRamImageGuardTest {
         // Tight total bitmap budget evicts oldest bitmaps when exceeded
         TerminalBitmap.setLowRamImageLimits(8 * 1024 * 1024, 4 * 1024 * 1024, 2048);
         Bitmap largeAllowedBmp = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888); // 3,200,000 bytes (~3.05 MiB)
-        assertNotNull(TerminalBitmap.build(buffer, 1001, largeAllowedBmp, 0, 0, 10, 20));
-        buffer.addTerminalBitmapForTesting(1001, TerminalBitmap.build(buffer, 1001, largeAllowedBmp, 0, 0, 10, 20));
+        ByteArrayOutputStream largePngOut = new ByteArrayOutputStream();
+        assertTrue(largeAllowedBmp.compress(Bitmap.CompressFormat.PNG, 100, largePngOut));
+        byte[] largePng = largePngOut.toByteArray();
+
+        int[] firstLargeDelta = buffer.addTerminalBitmapForImage(largePng, 0, 0, 10, 20, 1000, 800, false);
+        assertTrue(firstLargeDelta[0] > 0);
         // Second ~3.05 MiB bitmap exceeds 4 MiB total budget -> old bitmaps evicted
-        Bitmap largeAllowedBmp2 = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888);
-        buffer.addTerminalBitmapForTesting(1002, TerminalBitmap.build(buffer, 1002, largeAllowedBmp2, 0, 1, 10, 20));
+        int[] secondLargeDelta = buffer.addTerminalBitmapForImage(largePng, 0, 1, 10, 20, 1000, 800, false);
+        assertTrue(secondLargeDelta[0] > 0);
         assertTrue(buffer.getTotalTerminalBitmapBytes() <= 4 * 1024 * 1024L);
         assertEquals(1, buffer.getTerminalBitmapCount());
     }
