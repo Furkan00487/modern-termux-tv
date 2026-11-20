@@ -90,7 +90,7 @@ public class LowRamImageGuardTest {
         LowRamPolicy.applyTerminalImagePolicy(1024L * ONE_MIB);
 
         // Exceeds single bitmap byte limit via multipart chunks
-        ITermImage img = new ITermImage(null, true);
+        ITermImage img = new ITermImage(null, true) {};
         StringBuilder initArgs = new StringBuilder("1337;MultipartFile=inline=1");
         int idx = img.readArguments(null, initArgs, "1337;MultipartFile=".length());
         assertTrue(idx >= 0);
