@@ -76,4 +76,43 @@ class TvActionBarTest {
         assertFalse(guard.consumePostLongPressEvent(KeyEvent.ACTION_DOWN))
         assertFalse(guard.consumePostLongPressEvent(KeyEvent.ACTION_UP))
     }
+
+    @Test
+    fun dpadCenterPolicy_sendsEnterForTuiOrVisibleKeyboardAndOpensKeyboardAtPrompt() {
+        // Normal shell prompt with keyboard hidden -> open soft keyboard
+        assertFalse(
+            TvDpadCenterPolicy.shouldSendEnter(
+                isAlternateBufferActive = false,
+                isMouseTrackingActive = false,
+                isSoftKeyboardVisible = false
+            )
+        )
+
+        // Alternate-buffer TUIs (vim, nano, htop) -> send Enter
+        assertTrue(
+            TvDpadCenterPolicy.shouldSendEnter(
+                isAlternateBufferActive = true,
+                isMouseTrackingActive = false,
+                isSoftKeyboardVisible = false
+            )
+        )
+
+        // Main-buffer TUIs with mouse tracking (e.g. ncurses dialog) -> send Enter
+        assertTrue(
+            TvDpadCenterPolicy.shouldSendEnter(
+                isAlternateBufferActive = false,
+                isMouseTrackingActive = true,
+                isSoftKeyboardVisible = false
+            )
+        )
+
+        // Normal shell prompt when soft keyboard is already visible -> send Enter
+        assertTrue(
+            TvDpadCenterPolicy.shouldSendEnter(
+                isAlternateBufferActive = false,
+                isMouseTrackingActive = false,
+                isSoftKeyboardVisible = true
+            )
+        )
+    }
 }

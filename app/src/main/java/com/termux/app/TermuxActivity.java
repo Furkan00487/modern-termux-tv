@@ -38,6 +38,7 @@ import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.app.tv.LowRamWarningHost;
 import com.termux.app.tv.TvActionBarBridge;
+import com.termux.app.tv.TvDpadCenterPolicy;
 import com.termux.app.tv.TvDpadLongPressGuard;
 import com.termux.app.tv.TvDrawerBridge;
 import com.termux.shared.activities.ReportActivity;
@@ -64,6 +65,7 @@ import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
 import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
+import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
 import com.termux.view.TerminalView;
@@ -929,13 +931,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                     mTvKeyHandler.removeCallbacks(mDpadCenterLongPressRunnable);
                     if (!mDpadLongPressGuard.getSuppressNextCenterUp()) {
                         TerminalSession current = getCurrentSession();
-                        boolean isAltBuffer = current != null
-                            && current.getEmulator() != null
-                            && current.getEmulator().isAlternateBufferActive();
-                        if (!isAltBuffer && !KeyboardUtils.isSoftKeyboardVisible(this)) {
+                        TerminalEmulator emulator = current != null ? current.getEmulator() : null;
+                        if (TvDpadCenterPolicy.shouldSendEnter(
+                            emulator != null && emulator.isAlternateBufferActive(),
+                            emulator != null && emulator.isMouseTrackingActive(),
+                            KeyboardUtils.isSoftKeyboardVisible(this)
+                        )) {
+                            if (current != null) {
+                                current.write("\r");
+                            }
+                        } else {
                             showTvSoftKeyboard();
-                        } else if (current != null) {
-                            current.write("\r");
                         }
                     }
                     mDpadLongPressGuard.reset();

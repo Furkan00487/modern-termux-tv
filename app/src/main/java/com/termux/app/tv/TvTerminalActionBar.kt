@@ -80,6 +80,23 @@ class TvDpadLongPressGuard {
     }
 }
 
+/**
+ * Decides whether a short-press DPAD_CENTER on the terminal should send Enter ("\r")
+ * instead of opening the soft keyboard. Interactive TUIs either switch to the alternate
+ * screen buffer (vim, nano, htop) or enable mouse tracking while remaining on the main
+ * buffer (e.g. dialog, ncurses prompts).
+ */
+object TvDpadCenterPolicy {
+    @JvmStatic
+    fun shouldSendEnter(
+        isAlternateBufferActive: Boolean,
+        isMouseTrackingActive: Boolean,
+        isSoftKeyboardVisible: Boolean
+    ): Boolean {
+        return isAlternateBufferActive || isMouseTrackingActive || isSoftKeyboardVisible
+    }
+}
+
 class TvActionBarBridge(
     private val onOpenDrawer: () -> Unit,
     private val onShowKeyboard: () -> Unit,
