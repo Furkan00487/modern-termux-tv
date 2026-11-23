@@ -35,7 +35,7 @@ android {
         implementation "androidx.viewpager:viewpager:1.1.0"
         implementation "com.google.android.material:material:1.14.0"
 
-        def composeBom = platform("androidx.compose:compose-bom:2026.09.00")
+        def composeBom = platform("androidx.compose:compose-bom:2026.11.01")
         implementation composeBom
         testImplementation composeBom
         androidTestImplementation composeBom
