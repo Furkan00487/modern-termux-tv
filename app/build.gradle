@@ -20,7 +20,11 @@ ext {
 android {
     namespace "com.termux"
 
-    compileSdkVersion project.properties.compileSdkVersion.toInteger()
+    compileSdk {
+        version = release(project.properties.compileSdkVersion.toInteger()) {
+            it.minorApiLevel = project.properties.compileSdkMinorVersion.toInteger()
+        }
+    }
     ndkVersion = System.getenv("JITPACK_NDK_VERSION") ?: project.properties.ndkVersion
     def appVersionName = System.getenv("TERMUX_APP_VERSION_NAME") ?: ""
     def apkVersionTag = System.getenv("TERMUX_APK_VERSION_TAG") ?: ""
@@ -63,8 +67,8 @@ android {
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
-        versionCode 128
-        versionName "0.124.2"
+        versionCode 129
+        versionName "0.124.8"
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
